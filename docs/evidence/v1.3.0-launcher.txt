@@ -1,0 +1,25 @@
+[1/3] Checking local dependencies...
+[2/3] Building the current site...
+
+> autokala-store@1.3.0 build
+> tsc --noEmit && vite build
+
+vite v8.3.5 building client environment for production...
+transforming...
+✓ 102 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/robots.txt                                               0.02 kB │ gzip:   0.04 kB
+dist/index.html                                               1.14 kB │ gzip:   0.53 kB
+dist/assets/vazirmatn-latin-ext-wght-normal-tDTa1Fj6.woff2   21.86 kB
+dist/assets/vazirmatn-latin-wght-normal-BFexNX-K.woff2       34.52 kB
+dist/assets/vazirmatn-arabic-wght-normal-Cafbb7Zc.woff2      46.30 kB
+dist/assets/AdminPanel-kAA4rLMD.css                           9.49 kB │ gzip:   2.39 kB
+dist/assets/index--Pki3lsw.css                               68.30 kB │ gzip:  15.86 kB
+dist/assets/AdminPanel-s1ebIZ-7.js                           31.44 kB │ gzip:   8.44 kB
+dist/assets/index-BsztfkgP.js                               374.37 kB │ gzip: 117.61 kB
+
+✓ built in 1.08s
+The matching local site is already running. Reusing it; no extra server was started.
+SHOP: http://127.0.0.1:3001/
+ADMIN: http://localhost:3001/

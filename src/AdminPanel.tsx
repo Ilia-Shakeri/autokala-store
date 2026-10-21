@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } fro
 import { api, json, normalize } from './api'
 import { Modal } from './Modal'
 import { LoadingCar } from './LoadingCar'
+import { ActionButton } from './ActionButton'
 import { ProductImage } from './ProductImage'
 import { Select } from './Select'
 import { formatPrice, Icon, Logo, categoryIcon, type IconName } from './ui'
@@ -78,7 +79,7 @@ function ProductForm({ product, categories, busy, error, onSave, onClose }: {
     <label className="description-field">مشخصات و راهنمای تطبیق<textarea required minLength={10} maxLength={2000} value={form.description} onChange={e => field('description', e.target.value)} placeholder="نوع موتور، کد فنی، تعداد در بسته و نکته لازم پیش از نصب را بنویسید." /></label>
     </fieldset>
     {error && <p role="alert" className="admin-form-error">{error}</p>}
-    <div className="modal-actions"><button type="button" disabled={busy} onClick={onClose}>انصراف</button><button type="submit" disabled={busy || !categories.length}>{busy ? <LoadingCar inline label="در حال ذخیره…"/> : 'ذخیره کالا'}{!busy && <Icon name="check" size={18} />}</button></div>
+    <div className="modal-actions"><button type="button" disabled={busy} onClick={onClose}>انصراف</button><ActionButton type="submit" pending={busy} disabled={!categories.length} pendingLabel="در حال ذخیره…">ذخیره کالا<Icon name="check" size={18}/></ActionButton></div>
   </form>
 }
 
@@ -91,7 +92,7 @@ function CategoryForm({ busy, error, onSave, onClose }: {busy: boolean; error: s
       <label>نماد دسته<Select label="نماد دسته" value={icon} disabled={busy} onValueChange={setIcon} options={[{value:'oil',label:'روغن و سیالات'},{value:'filter',label:'فیلتر'},{value:'brake',label:'ترمز'},{value:'spark',label:'برق'},{value:'wiper',label:'برف‌پاک‌کن'},{value:'spray',label:'نظافت'}]} /></label></div>
     </fieldset>
     {error && <p role="alert" className="admin-form-error">{error}</p>}
-    <div className="modal-actions"><button type="button" disabled={busy} onClick={onClose}>انصراف</button><button type="submit" disabled={busy}>{busy ? <LoadingCar inline label="در حال ثبت…"/> : 'ساخت دسته'}{!busy && <Icon name="check" size={18} />}</button></div>
+    <div className="modal-actions"><button type="button" disabled={busy} onClick={onClose}>انصراف</button><ActionButton type="submit" pending={busy}>ساخت دسته<Icon name="check" size={18}/></ActionButton></div>
   </form>
 }
 
@@ -285,7 +286,7 @@ export default function AdminPanel({ onStore, user, onLogout, onCatalogChange }:
         <dl className="admin-order-totals"><div><dt>جمع کالاها</dt><dd>{formatPrice(selectedOrder.subtotal)} تومان</dd></div><div><dt>هزینه ارسال ثبت‌شده</dt><dd>{formatPrice(selectedOrder.shipping)} تومان</dd></div><div><dt>مبلغ سفارش</dt><dd><strong>{formatPrice(selectedOrder.total)} تومان</strong></dd></div></dl>
         {selectedOrder.status === 'pending_payment' && <label className="admin-payment-check"><input type="checkbox" checked={paymentChecked} onChange={e => setPaymentChecked(e.target.checked)} disabled={busy} /><span>دریافت وجه این سفارش را بررسی کرده‌ام. این تأیید دستی است و تراکنش درگاه ایجاد نمی‌کند.</span></label>}
         {writeError && <p className="admin-form-error" role="alert">{writeError}</p>}
-        <div className="modal-actions admin-order-actions">{selectedOrder.status === 'pending_payment' && <button type="button" className="admin-cancel" disabled={busy} onClick={() => changeStatus(selectedOrder, 'cancelled')}>لغو سفارش و بازگرداندن موجودی</button>}{nextStatus[selectedOrder.status] && <button type="button" disabled={busy || (selectedOrder.status === 'pending_payment' && !paymentChecked)} onClick={() => changeStatus(selectedOrder, nextStatus[selectedOrder.status])}>{busy ? <LoadingCar inline label="در حال ثبت…"/> : actionLabels[nextStatus[selectedOrder.status]]}{!busy && <Icon name="check" size={18} />}</button>}</div>
+        <div className="modal-actions admin-order-actions">{selectedOrder.status === 'pending_payment' && <button type="button" className="admin-cancel" disabled={busy} onClick={() => changeStatus(selectedOrder, 'cancelled')}>لغو سفارش و بازگرداندن موجودی</button>}{nextStatus[selectedOrder.status] && <ActionButton type="button" pending={busy} disabled={selectedOrder.status === 'pending_payment' && !paymentChecked} onClick={() => changeStatus(selectedOrder, nextStatus[selectedOrder.status])}>{actionLabels[nextStatus[selectedOrder.status]]}<Icon name="check" size={18}/></ActionButton>}</div>
       </div>
     </Modal>}
   </div>

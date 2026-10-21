@@ -1,0 +1,45 @@
+{
+  "compact": {
+    "backdrop": "none",
+    "buttonHeight": 47.9970703125,
+    "buttonWidth": 168.32717895507812,
+    "footerVisible": true,
+    "height": 568,
+    "overflow": false,
+    "width": 320
+  },
+  "doneCompact": {
+    "height": 48,
+    "width": 168.33750915527344
+  },
+  "keyboard": {
+    "footerFocused": true,
+    "input": "keyboard",
+    "transition": "0s"
+  },
+  "desktopChecks": 12,
+  "mobileChecks": 12,
+  "cart390": {
+    "before": {
+      "height": 48,
+      "width": 238.7375030517578
+    },
+    "after": {
+      "height": 48,
+      "width": 238.7375030517578
+    }
+  },
+  "checkout390": {
+    "idle": {
+      "height": 44,
+      "width": 251.9375
+    },
+    "pending": {
+      "width": 251.9375,
+      "height": 44,
+      "disabled": true,
+      "busy": true
+    }
+  },
+  "scope": "Browser checks on local demo; 2000ms POST delay only in the isolated in-memory QA fixture. No real payment."
+}

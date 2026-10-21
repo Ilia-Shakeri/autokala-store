@@ -4,6 +4,7 @@ import App from './App'
 import FaultBoundary from './FaultBoundary'
 import './index.css'
 import './commerce-polish.css'
+import './glass.css'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

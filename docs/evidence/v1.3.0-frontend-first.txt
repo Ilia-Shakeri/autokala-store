@@ -1,0 +1,15 @@
+
+> autokala-store@1.2.0 test:frontend
+> vitest run --config vitest.config.ts
+
+
+ RUN  v5.0.5 C:/Users/Dear-OTCamp-User/Desktop/فروشگاه آنلاین لوازم خودرو
+
+
+ Test Files  8 passed (8)
+      Tests  31 passed (31)
+   Start at  17:06:37
+   Duration  20.94s (environment 55%, tests 26%, setup 9%, import 6%, transform 3%)
+
+    Isolate  8 workers spawned · ~1.51s startup each (spawn + environment, per file)
+             at least ~10.55s faster with isolate: false — reuses workers across files instead of one per file

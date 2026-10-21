@@ -10,7 +10,22 @@ const quote={subtotal:200,shipping:10,total:210,items:[{productId:1,name:'کال
 const order={id:'AK-ABCDEF0123456789',customer:{name:'کاربر نمونه',email:'buyer@example.test',phone:'09123456789',address:'نشانی ساختگی برای آزمون، پلاک ۱۲',postalCode:'1234567890'},items:quote.items,subtotal:200,shipping:10,total:210,status:'pending_payment',createdAt:new Date().toISOString()}
 beforeEach(()=>mocked.mockReset())
 async function fill(){await waitFor(()=>expect((screen.getByRole('button',{name:'ثبت سفارش در انتظار پرداخت'}) as HTMLButtonElement).disabled).toBe(false));for(const [name,value] of [['نام و نام خانوادگی','کاربر نمونه'],['موبایل گیرنده','09123456789'],['ایمیل رسید','buyer@example.test'],['کد پستی','1234567890'],['نشانی کامل','نشانی ساختگی برای آزمون، پلاک ۱۲']])fireEvent.change(screen.getByLabelText(name,{exact:true}),{target:{value}})}
-function submit(){fireEvent.submit(screen.getByRole('button',{name:'ثبت سفارش در انتظار پرداخت'}).closest('form')!)}
+function submit(){fireEvent.submit((screen.getByRole('button',{name:'ثبت سفارش در انتظار پرداخت'}) as HTMLButtonElement).form!)}
+
+it('keeps submit linked to the form and blocks duplicate submission while the real request is pending',async()=>{
+  let finish:(value:unknown)=>void=()=>{}
+  mocked.mockImplementation(async path=>{if(path==='/quote')return quote;if(path==='/orders')return new Promise(resolve=>{finish=resolve});return {} as never})
+  render(<CheckoutDialog items={items} user={null} onClose={()=>{}} onComplete={()=>{}}/>);await fill()
+  const button=screen.getByRole('button',{name:'ثبت سفارش در انتظار پرداخت'}) as HTMLButtonElement
+  expect(button.closest('form')).toBeNull();expect(button.form).toBeTruthy()
+  const form=button.form!
+  fireEvent.submit(form);fireEvent.submit(form)
+  expect((screen.getByRole('button',{name:'در حال ثبت…'}) as HTMLButtonElement).disabled).toBe(true)
+  expect(screen.queryByText('سفارش ثبت شد. پرداخت هنوز انجام نشده است.')).toBeNull()
+  expect(mocked.mock.calls.filter(([path])=>path==='/orders')).toHaveLength(1)
+  finish({order,receiptToken:'b'.repeat(43)})
+  await screen.findByText('سفارش ثبت شد. پرداخت هنوز انجام نشده است.')
+})
 
 it('invalidates a stale total after conflict and requires a fresh quote before retry',async()=>{
   let quotes=0,orders=0
