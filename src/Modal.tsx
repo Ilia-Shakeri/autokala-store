@@ -6,7 +6,7 @@ let activeModals = 0
 let originalInert = false
 let originalOverflow = ''
 
-export function Modal({ title, onClose, children, drawer = false, className = '' }: {title: string; onClose: () => void; children: ReactNode; drawer?: boolean; className?: string}) {
+export function Modal({ title, onClose, children, drawer = false, className = '', footer }: {title: string; onClose: () => void; children: ReactNode; drawer?: boolean; className?: string; footer?: ReactNode}) {
   const panel = useRef<HTMLDivElement>(null)
   const close = useRef(onClose)
   close.current = onClose
@@ -37,6 +37,7 @@ export function Modal({ title, onClose, children, drawer = false, className = ''
     <div className={`${drawer ? 'cart-drawer' : 'product-modal'} ${className}`} ref={panel} role="dialog" aria-modal="true" aria-label={title} tabIndex={-1} onClick={e => e.stopPropagation()} dir="rtl">
       <div className="drawer-head"><h2>{title}</h2><button type="button" aria-label="بستن" onClick={onClose}><Icon name="x" /></button></div>
       {children}
+      {footer && <div className="modal-footer">{footer}</div>}
     </div>
   </div>, document.body)
 }

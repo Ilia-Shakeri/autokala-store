@@ -22,3 +22,9 @@ it('does not let a prevented menu Escape close its parent modal',()=>{
   const close=vi.fn();render(<Modal title="آزمون" onClose={close}><button onKeyDown={event=>event.preventDefault()}>فهرست</button></Modal>)
   fireEvent.keyDown(screen.getByRole('button',{name:'فهرست'}),{key:'Escape'});expect(close).not.toHaveBeenCalled()
 })
+it('keeps footer purchase actions inside the focus cycle',()=>{
+  render(<Modal title="کالا" onClose={()=>{}} footer={<button>افزودن به سبد</button>}><p>شرح کالا</p></Modal>)
+  const purchase=screen.getByRole('button',{name:'افزودن به سبد'});purchase.focus()
+  fireEvent.keyDown(purchase,{key:'Tab'})
+  expect(document.activeElement).toBe(screen.getByRole('button',{name:'بستن'}))
+})
