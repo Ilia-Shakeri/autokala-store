@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { api, json, ApiError } from './api'
 import { Modal } from './Modal'
+import { LoadingCar } from './LoadingCar'
 import { Select } from './Select'
 import { formatPrice } from './ui'
 import type { CartItem, Customer, Order, User } from './types'
@@ -59,10 +60,10 @@ export function CheckoutDialog({items, user, onClose, onComplete}: {items: CartI
       </div>
       <label className="description-field">نشانی کامل<textarea autoComplete="street-address" required minLength={15} maxLength={1000} value={customer.address} onChange={e=>field('address',e.target.value)} placeholder="استان، شهر، خیابان، کوچه، پلاک و واحد" /></label>
       <label className="description-field">یادداشت سفارش، اختیاری<textarea maxLength={500} value={note} onChange={e=>setNote(e.target.value)} placeholder="زمان مناسب هماهنگی یا نکته لازم درباره تحویل" /></label>
-      {quote && <div className="order-receipt"><p>جمع کالاها <span>{formatPrice(quote.subtotal)} تومان</span></p><p>ارسال نمونه <span>{formatPrice(quote.shipping)} تومان</span></p><p><strong>جمع سفارش</strong><strong>{formatPrice(quote.total)} تومان</strong></p></div>}
+      {!quote&&!error&&<LoadingCar label="در حال دریافت مبلغ سفارش…"/>}{quote && <div className="order-receipt"><p>جمع کالاها <span>{formatPrice(quote.subtotal)} تومان</span></p><p>ارسال نمونه <span>{formatPrice(quote.shipping)} تومان</span></p><p><strong>جمع سفارش</strong><strong>{formatPrice(quote.total)} تومان</strong></p></div>}
       {error && <p className="form-error" role="alert">{error}{!quote && <button type="button" onClick={()=>setQuoteAttempt(value=>value+1)}>دریافت دوباره مبلغ</button>}</p>}
       <p className="muted-note">مبلغ و موجودی هنگام ثبت، دوباره در سرور بررسی می‌شوند. سفارش بی‌پرداخت پس از ۲۴ ساعت لغو و رزرو کالا آزاد می‌شود. درگاه پرداخت و روش ارسال در انتظار تنظیم‌اند.</p>
-      <div className="modal-actions"><button type="button" disabled={busy} onClick={onClose}>بازگشت</button><button disabled={busy || !quote}>{busy ? 'در حال ثبت…' : 'ثبت سفارش در انتظار پرداخت'}</button></div>
+      <div className="modal-actions"><button type="button" disabled={busy} onClick={onClose}>بازگشت</button><button disabled={busy || !quote}>{busy ? <LoadingCar inline label="در حال ثبت…"/> : 'ثبت سفارش در انتظار پرداخت'}</button></div>
     </form>}
   </Modal>
 }
@@ -72,13 +73,14 @@ export function AccountDialog({user,adminRequested,onClose,onAuthenticated,onLog
   const [busy,setBusy] = useState(false)
   const [error,setError] = useState('')
   const [orders,setOrders] = useState<Order[]>([])
+  const [ordersLoading,setOrdersLoading] = useState(Boolean(user))
   const [hasMore,setHasMore] = useState(false)
   const [tracked,setTracked] = useState<Order | null>(null)
   const [id,setId] = useState('')
   const [token,setToken] = useState('')
   const [savedReceipt,setSavedReceipt] = useState('')
   const [saved] = useState(savedReceipts)
-  useEffect(() => {if(user) api<{orders:Order[];pagination:{hasMore:boolean}}>('/orders?limit=50').then(result=>{setOrders(result.orders);setHasMore(result.pagination.hasMore)}).catch(e=>setError(e.message))}, [user])
+  useEffect(() => {let active=true;setOrders([]);setHasMore(false);setOrdersLoading(Boolean(user));if(user)void api<{orders:Order[];pagination:{hasMore:boolean}}>('/orders?limit=50').then(result=>{if(active){setOrders(result.orders);setHasMore(result.pagination.hasMore)}}).catch(e=>{if(active)setError(e.message)}).finally(()=>{if(active)setOrdersLoading(false)});return()=>{active=false}}, [user])
   const moreOrders = async () => {if(busy)return;setBusy(true);setError('');try{const result=await api<{orders:Order[];pagination:{hasMore:boolean}}>(`/orders?limit=50&offset=${orders.length}`);setOrders(current=>[...current,...result.orders]);setHasMore(result.pagination.hasMore)}catch(e){setError((e as Error).message)}finally{setBusy(false)}}
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault(); if(busy)return;setBusy(true);setError('')
@@ -88,9 +90,9 @@ export function AccountDialog({user,adminRequested,onClose,onAuthenticated,onLog
   const track = async (event:FormEvent) => {event.preventDefault();if(busy)return;setBusy(true);setError('');setTracked(null);try{const result=await api<{order:Order}>(`/orders/${encodeURIComponent(id)}`,{headers:{'X-Receipt-Token':token}});setTracked(result.order)}catch(e){setError((e as Error).message)}finally{setBusy(false)}}
   return <Modal title={user ? `حساب ${user.name}` : adminRequested ? 'ورود مدیر فروشگاه' : 'حساب و پیگیری سفارش'} onClose={onClose}>
     <div className="filter-pills dialog-tabs">{!user && <><button onClick={()=>{setMode('login');setError('')}} className={mode==='login'?'active':''}>ورود</button><button onClick={()=>{setMode('register');setError('')}} className={mode==='register'?'active':''}>ساخت حساب</button></>}<button onClick={()=>{setMode('track');setError('')}} className={mode==='track'?'active':''}>پیگیری سفارش</button></div>
-    {!user && mode!=='track' && <form onSubmit={submit}><div className="form-grid">{mode==='register'&&<label>نام کامل<input required name="name" autoComplete="name" minLength={3} maxLength={100} placeholder="نام و نام خانوادگی" /></label>}<label>ایمیل<input required name="email" type="email" dir="ltr" autoComplete="username" placeholder="name@example.com" /></label><label>رمز عبور<input required name="password" type="password" minLength={12} maxLength={128} autoComplete={mode==='register'?'new-password':'current-password'} placeholder="حداقل ۱۲ نویسه" /></label></div><div className="modal-actions"><button disabled={busy}>{busy?'در حال بررسی…':mode==='login'?'ورود به حساب':'ساخت حساب'}</button></div>{adminRequested&&<p className="muted-note">حساب مدیر با فرمان محلی ساخته می‌شود. حساب تازه، دسترسی مدیریت ندارد.</p>}</form>}
-    {(mode==='track'||user)&&<><form onSubmit={track}><div className="form-grid"><label>شماره سفارش<input required value={id} onChange={e=>setId(e.target.value)} dir="ltr" placeholder="شماره روی رسید" /></label><label>کلید پیگیری<input value={token} onChange={e=>setToken(e.target.value)} dir="ltr" placeholder="کلید محرمانه روی رسید" /></label></div><div className="modal-actions"><button disabled={busy}>{busy?'در حال دریافت…':'نمایش سفارش'}</button></div></form>{saved.length>0&&<label className="description-field">رسیدهای این دستگاه<Select label="رسیدهای این دستگاه" value={savedReceipt} placeholder="انتخاب رسید ذخیره‌شده" options={saved.map(r=>({value:r.id,label:r.id}))} onValueChange={value=>{setSavedReceipt(value);const receipt=saved.find(r=>r.id===value);if(receipt){setId(receipt.id);setToken(receipt.token||'')}}}/></label>}{tracked&&<OrderCard order={tracked} />}{user&&<><h3>سفارش‌های حساب</h3>{orders.length?orders.map(order=><OrderCard order={order} key={order.id}/>):<p className="muted-note">هنوز سفارشی با این حساب ثبت نشده است.</p>}</>}</>}
-    {hasMore&&<div className="modal-actions"><button onClick={moreOrders} disabled={busy}>سفارش‌های بیشتر</button></div>}
+    {!user && mode!=='track' && <form onSubmit={submit}><div className="form-grid">{mode==='register'&&<label>نام کامل<input required name="name" autoComplete="name" minLength={3} maxLength={100} placeholder="نام و نام خانوادگی" /></label>}<label>ایمیل<input required name="email" type="email" dir="ltr" autoComplete="username" placeholder="name@example.com" /></label><label>رمز عبور<input required name="password" type="password" minLength={12} maxLength={128} autoComplete={mode==='register'?'new-password':'current-password'} placeholder="حداقل ۱۲ نویسه" /></label></div><div className="modal-actions"><button disabled={busy}>{busy?<LoadingCar inline label="در حال بررسی…"/>:mode==='login'?'ورود به حساب':'ساخت حساب'}</button></div>{adminRequested&&<p className="muted-note">حساب مدیر با فرمان محلی ساخته می‌شود. حساب تازه، دسترسی مدیریت ندارد.</p>}</form>}
+    {(mode==='track'||user)&&<><form onSubmit={track}><div className="form-grid"><label>شماره سفارش<input required value={id} onChange={e=>setId(e.target.value)} dir="ltr" placeholder="شماره روی رسید" /></label><label>کلید پیگیری<input value={token} onChange={e=>setToken(e.target.value)} dir="ltr" placeholder="کلید محرمانه روی رسید" /></label></div><div className="modal-actions"><button disabled={busy}>{busy?<LoadingCar inline label="در حال دریافت…"/>:'نمایش سفارش'}</button></div></form>{saved.length>0&&<label className="description-field">رسیدهای این دستگاه<Select label="رسیدهای این دستگاه" value={savedReceipt} placeholder="انتخاب رسید ذخیره‌شده" options={saved.map(r=>({value:r.id,label:r.id}))} onValueChange={value=>{setSavedReceipt(value);const receipt=saved.find(r=>r.id===value);if(receipt){setId(receipt.id);setToken(receipt.token||'')}}}/></label>}{tracked&&<OrderCard order={tracked} />}{user&&<><h3>سفارش‌های حساب</h3>{ordersLoading?<LoadingCar label="در حال دریافت سفارش‌ها…"/>:orders.length?orders.map(order=><OrderCard order={order} key={order.id}/>):<p className="muted-note">هنوز سفارشی با این حساب ثبت نشده است.</p>}</>}</>}
+    {hasMore&&<div className="modal-actions"><button onClick={moreOrders} disabled={busy}>{busy?<LoadingCar inline label="در حال دریافت سفارش‌ها…"/>:"سفارش‌های بیشتر"}</button></div>}
     {error&&<p className="form-error" role="alert">{error}</p>}{user&&<div className="modal-actions"><button onClick={()=>{onLogout();onClose()}}>خروج از حساب</button></div>}
   </Modal>
 }

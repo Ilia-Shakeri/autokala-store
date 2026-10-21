@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { api, json, normalize } from './api'
 import { Modal } from './Modal'
+import { LoadingCar } from './LoadingCar'
 import { ProductImage } from './ProductImage'
 import { Select } from './Select'
 import { formatPrice, Icon, Logo, type IconName } from './ui'
@@ -77,7 +78,7 @@ function ProductForm({ product, categories, busy, error, onSave, onClose }: {
     <label className="description-field">مشخصات و راهنمای تطبیق<textarea required minLength={10} maxLength={2000} value={form.description} onChange={e => field('description', e.target.value)} placeholder="نوع موتور، کد فنی، تعداد در بسته و نکته لازم پیش از نصب را بنویسید." /></label>
     </fieldset>
     {error && <p role="alert" className="admin-form-error">{error}</p>}
-    <div className="modal-actions"><button type="button" disabled={busy} onClick={onClose}>انصراف</button><button type="submit" disabled={busy || !categories.length}>{busy ? 'در حال ذخیره…' : 'ذخیره کالا'}<Icon name="check" size={18} /></button></div>
+    <div className="modal-actions"><button type="button" disabled={busy} onClick={onClose}>انصراف</button><button type="submit" disabled={busy || !categories.length}>{busy ? <LoadingCar inline label="در حال ذخیره…"/> : 'ذخیره کالا'}{!busy && <Icon name="check" size={18} />}</button></div>
   </form>
 }
 
@@ -90,7 +91,7 @@ function CategoryForm({ busy, error, onSave, onClose }: {busy: boolean; error: s
       <label>نماد دسته<Select label="نماد دسته" value={icon} disabled={busy} onValueChange={setIcon} options={[{value:'oil',label:'روغن و سیالات'},{value:'filter',label:'فیلتر'},{value:'brake',label:'ترمز'},{value:'spark',label:'برق'},{value:'wiper',label:'برف‌پاک‌کن'},{value:'spray',label:'نظافت'}]} /></label></div>
     </fieldset>
     {error && <p role="alert" className="admin-form-error">{error}</p>}
-    <div className="modal-actions"><button type="button" disabled={busy} onClick={onClose}>انصراف</button><button type="submit" disabled={busy}>{busy ? 'در حال ثبت…' : 'ساخت دسته'}<Icon name="check" size={18} /></button></div>
+    <div className="modal-actions"><button type="button" disabled={busy} onClick={onClose}>انصراف</button><button type="submit" disabled={busy}>{busy ? <LoadingCar inline label="در حال ثبت…"/> : 'ساخت دسته'}{!busy && <Icon name="check" size={18} />}</button></div>
   </form>
 }
 
@@ -234,13 +235,13 @@ export default function AdminPanel({ onStore, user, onLogout, onCatalogChange }:
       <header className="admin-header">
         <button className="admin-menu" aria-label="باز کردن فهرست مدیریت" aria-expanded={sidebarOpen} onClick={() => setSidebarOpen(true)}><Icon name="menu" /></button>
         <div><span>{dayFormatter.format(new Date())}</span><h1>{active}</h1></div>
-        <div className="admin-header-actions"><button type="button" className="admin-refresh" title="دریافت تازه‌ترین اطلاعات" aria-label="دریافت تازه‌ترین اطلاعات" disabled={loading || ordersLoading || busy} onClick={() => void refresh()}><Icon name="arrow" /></button><button className="new-product" disabled={!overview || busy} onClick={() => openProduct()}><Icon name="plus" /> افزودن کالا</button></div>
+        <div className="admin-header-actions"><button type="button" className="admin-refresh" title="دریافت تازه‌ترین اطلاعات" aria-label="دریافت تازه‌ترین اطلاعات" disabled={loading || ordersLoading || busy} onClick={() => void refresh()}>{loading||ordersLoading?<LoadingCar inline iconOnly label="دریافت اطلاعات…"/>:<Icon name="refresh"/>}</button><button className="new-product" disabled={!overview || busy} onClick={() => openProduct()}><Icon name="plus" /> افزودن کالا</button></div>
       </header>
-      <div className="admin-update" aria-live="polite">{loading ? 'در حال دریافت اطلاعات…' : updated ? `آخرین دریافت: ${dateFormatter.format(updated)}` : ''}</div>
+      <div className="admin-update" aria-live="polite">{loading ? <LoadingCar inline label="در حال دریافت اطلاعات…"/> : updated ? `آخرین دریافت: ${dateFormatter.format(updated)}` : ''}</div>
       {notice && <div className="admin-notice" role="status"><Icon name="check" size={18} />{notice}<button aria-label="بستن پیام" onClick={() => setNotice('')}><Icon name="x" size={16} /></button></div>}
       {error && <div className="admin-error" role="alert"><p>{error}</p><button disabled={loading} onClick={() => void refresh()}>تلاش دوباره</button></div>}
       {writeError && !productModal && !categoryModal && !selectedOrder && <p role="alert" className="admin-form-error">{writeError}</p>}
-      {!overview && loading && <div className="admin-loading" role="status">دریافت کالاها و سفارش‌ها…</div>}
+      {!overview && loading && <div className="admin-loading"><LoadingCar label="دریافت کالاها و سفارش‌ها…"/></div>}
       {overview && <>
         {active === 'داشبورد' && <>
           <section className="welcome-card"><div><span>مرور فروشگاه</span><h2>{user.name}، خوش آمدید.</h2><p>{pending ? `${formatPrice(pending)} سفارش در انتظار بررسی پرداخت است.` : 'سفارش در انتظار بررسی پرداخت ندارید.'} اطلاعات این صفحه از پایگاه داده فروشگاه خوانده می‌شود.</p></div><Icon name="store" size={70} /></section>
@@ -251,7 +252,7 @@ export default function AdminPanel({ onStore, user, onLogout, onCatalogChange }:
           <div className="panel-heading"><div><h2>{active === 'داشبورد' ? 'سفارش‌های اخیر' : 'مدیریت سفارش‌ها'}</h2><span>{formatPrice(active === 'داشبورد' ? overview.metrics.orders : orderPage?.pagination.total || 0)} سفارش؛ جزئیات هر سفارش را برای بررسی باز کنید.</span></div></div>
           {active === 'سفارش‌ها' && <div className="admin-toolbar"><label>وضعیت سفارش<Select label="وضعیت سفارش" value={orderFilter} disabled={busy} onValueChange={setOrderFilter} options={[{value:'all',label:'همه وضعیت‌ها'},...Object.entries(statusLabels).map(([value,label])=>({value,label}))]} /></label><label className="admin-search">جست‌وجو در همه سفارش‌ها<input type="search" disabled={busy} value={orderSearch} onChange={e => setOrderSearch(e.target.value)} placeholder="کد سفارش، نام مشتری، ایمیل یا موبایل" /></label></div>}
           {active === 'سفارش‌ها' && ordersError && <div className="admin-error" role="alert"><p>{ordersError}</p><button disabled={ordersLoading} onClick={() => void loadOrders(requestedOffset.current)}>تلاش دوباره</button></div>}
-          {active === 'سفارش‌ها' && ordersLoading && <p className="admin-page-loading" role="status">دریافت صفحه سفارش‌ها…</p>}
+          {active === 'سفارش‌ها' && ordersLoading && <div className="admin-page-loading"><LoadingCar inline label="دریافت صفحه سفارش‌ها…"/></div>}
           <div className="order-table"><div role="table" aria-label="سفارش‌های فروشگاه"><div className="table-row table-head" role="row"><span role="columnheader">شماره سفارش</span><span role="columnheader">مشتری</span><span role="columnheader">مبلغ (تومان)</span><span role="columnheader">زمان ثبت</span><span role="columnheader">وضعیت</span><span role="columnheader">جزئیات</span></div>
             {(active === 'داشبورد' ? filteredOrders.slice(0, 8) : filteredOrders).map(order => <div className="table-row" key={order.id} role="row"><strong role="cell" className="admin-order-id" dir="ltr">{order.id}</strong><span role="cell" className="customer"><i>{order.customer.name.charAt(0)}</i>{order.customer.name}</span><b role="cell">{formatPrice(order.total)}</b><span role="cell">{dateLabel(order.createdAt)}</span><span role="cell"><i className={`status status-${order.status}`}>{statusLabels[order.status] || order.status}</i></span><span role="cell"><button className="confirm-btn" disabled={loading || ordersLoading || busy} onClick={() => showOrder(order.id)} aria-label={`جزئیات سفارش ${order.id}`}>بررسی</button></span></div>)}</div></div>
           {!filteredOrders.length && <p className="admin-empty">سفارشی با این مشخصات پیدا نشد.</p>}
@@ -284,7 +285,7 @@ export default function AdminPanel({ onStore, user, onLogout, onCatalogChange }:
         <dl className="admin-order-totals"><div><dt>جمع کالاها</dt><dd>{formatPrice(selectedOrder.subtotal)} تومان</dd></div><div><dt>هزینه ارسال ثبت‌شده</dt><dd>{formatPrice(selectedOrder.shipping)} تومان</dd></div><div><dt>مبلغ سفارش</dt><dd><strong>{formatPrice(selectedOrder.total)} تومان</strong></dd></div></dl>
         {selectedOrder.status === 'pending_payment' && <label className="admin-payment-check"><input type="checkbox" checked={paymentChecked} onChange={e => setPaymentChecked(e.target.checked)} disabled={busy} /><span>دریافت وجه این سفارش را بررسی کرده‌ام. این تأیید دستی است و تراکنش درگاه ایجاد نمی‌کند.</span></label>}
         {writeError && <p className="admin-form-error" role="alert">{writeError}</p>}
-        <div className="modal-actions admin-order-actions">{selectedOrder.status === 'pending_payment' && <button type="button" className="admin-cancel" disabled={busy} onClick={() => changeStatus(selectedOrder, 'cancelled')}>لغو سفارش و بازگرداندن موجودی</button>}{nextStatus[selectedOrder.status] && <button type="button" disabled={busy || (selectedOrder.status === 'pending_payment' && !paymentChecked)} onClick={() => changeStatus(selectedOrder, nextStatus[selectedOrder.status])}>{busy ? 'در حال ثبت…' : actionLabels[nextStatus[selectedOrder.status]]}<Icon name="check" size={18} /></button>}</div>
+        <div className="modal-actions admin-order-actions">{selectedOrder.status === 'pending_payment' && <button type="button" className="admin-cancel" disabled={busy} onClick={() => changeStatus(selectedOrder, 'cancelled')}>لغو سفارش و بازگرداندن موجودی</button>}{nextStatus[selectedOrder.status] && <button type="button" disabled={busy || (selectedOrder.status === 'pending_payment' && !paymentChecked)} onClick={() => changeStatus(selectedOrder, nextStatus[selectedOrder.status])}>{busy ? <LoadingCar inline label="در حال ثبت…"/> : actionLabels[nextStatus[selectedOrder.status]]}{!busy && <Icon name="check" size={18} />}</button>}</div>
       </div>
     </Modal>}
   </div>

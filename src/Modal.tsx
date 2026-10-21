@@ -6,7 +6,7 @@ let activeModals = 0
 let originalInert = false
 let originalOverflow = ''
 
-export function Modal({ title, onClose, children, drawer = false }: {title: string; onClose: () => void; children: ReactNode; drawer?: boolean}) {
+export function Modal({ title, onClose, children, drawer = false, className = '' }: {title: string; onClose: () => void; children: ReactNode; drawer?: boolean; className?: string}) {
   const panel = useRef<HTMLDivElement>(null)
   const close = useRef(onClose)
   close.current = onClose
@@ -34,7 +34,7 @@ export function Modal({ title, onClose, children, drawer = false }: {title: stri
     return () => { document.removeEventListener('keydown', key); if(--activeModals===0){document.body.style.overflow=originalOverflow;if(root)root.inert=originalInert} previous?.focus() }
   }, [])
   return createPortal(<div className={drawer ? 'drawer-backdrop' : 'modal-backdrop'} onClick={onClose}>
-    <div className={drawer ? 'cart-drawer' : 'product-modal'} ref={panel} role="dialog" aria-modal="true" aria-label={title} tabIndex={-1} onClick={e => e.stopPropagation()} dir="rtl">
+    <div className={`${drawer ? 'cart-drawer' : 'product-modal'} ${className}`} ref={panel} role="dialog" aria-modal="true" aria-label={title} tabIndex={-1} onClick={e => e.stopPropagation()} dir="rtl">
       <div className="drawer-head"><h2>{title}</h2><button type="button" aria-label="بستن" onClick={onClose}><Icon name="x" /></button></div>
       {children}
     </div>

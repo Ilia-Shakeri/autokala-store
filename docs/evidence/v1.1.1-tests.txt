@@ -1,0 +1,266 @@
+
+> autokala-store@1.1.1 test
+> npm run test:backend && npm run test:frontend
+
+
+> autokala-store@1.1.1 test:backend
+> node --test --test-concurrency=1 test/*.test.mjs
+
+TAP version 13
+# Subtest: all demo products use verified bounded local photographs with source and license
+ok 1 - all demo products use verified bounded local photographs with source and license
+  ---
+  duration_ms: 2.8579
+  type: 'test'
+  ...
+# (node:17212) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: admin command creates only a hashed account and intentional reset revokes old sessions
+ok 2 - admin command creates only a hashed account and intentional reset revokes old sessions
+  ---
+  duration_ms: 670.5259
+  type: 'test'
+  ...
+# Subtest: admin command rejects password arguments and oversized password files
+ok 3 - admin command rejects password arguments and oversized password files
+  ---
+  duration_ms: 253.5739
+  type: 'test'
+  ...
+# Subtest: backup command copies current WAL data and refuses to replace either database
+ok 4 - backup command copies current WAL data and refuses to replace either database
+  ---
+  duration_ms: 251.0145
+  type: 'test'
+  ...
+# (node:10812) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: health, catalog revalidation and headers work without a session
+ok 5 - health, catalog revalidation and headers work without a session
+  ---
+  duration_ms: 70.5493
+  type: 'test'
+  ...
+# Subtest: quote rejects bad quantities and uses database prices with merged duplicate lines
+ok 6 - quote rejects bad quantities and uses database prices with merged duplicate lines
+  ---
+  duration_ms: 116.5367
+  type: 'test'
+  ...
+# Subtest: checkout rejects malformed customer fields before reserving stock
+ok 7 - checkout rejects malformed customer fields before reserving stock
+  ---
+  duration_ms: 48.3745
+  type: 'test'
+  ...
+# Subtest: order price is authoritative and idempotent retries reserve stock once
+ok 8 - order price is authoritative and idempotent retries reserve stock once
+  ---
+  duration_ms: 13.97
+  type: 'test'
+  ...
+# Subtest: insufficient stock rolls the full order back
+ok 9 - insufficient stock rolls the full order back
+  ---
+  duration_ms: 10.9038
+  type: 'test'
+  ...
+# Subtest: checkout rejects a stale displayed total without reserving stock and permits an explicit refreshed total
+ok 10 - checkout rejects a stale displayed total without reserving stock and permits an explicit refreshed total
+  ---
+  duration_ms: 207.9169
+  type: 'test'
+  ...
+# Subtest: concurrent buyers cannot sell the last unit twice
+ok 11 - concurrent buyers cannot sell the last unit twice
+  ---
+  duration_ms: 16.5059
+  type: 'test'
+  ...
+# Subtest: guest order data requires its receipt token and does not leak by identifier
+ok 12 - guest order data requires its receipt token and does not leak by identifier
+  ---
+  duration_ms: 116.8519
+  type: 'test'
+  ...
+# Subtest: customer login, own orders, role boundary and logout work
+ok 13 - customer login, own orders, role boundary and logout work
+  ---
+  duration_ms: 348.7045
+  type: 'test'
+  ...
+# Subtest: bad Origin and cross-site writes fail, allowed same-origin writes work
+ok 14 - bad Origin and cross-site writes fail, allowed same-origin writes work
+  ---
+  duration_ms: 17.4051
+  type: 'test'
+  ...
+# Subtest: admin product, category and settings changes reach the catalog and quote
+ok 15 - admin product, category and settings changes reach the catalog and quote
+  ---
+  duration_ms: 184.6648
+  type: 'test'
+  ...
+# Subtest: order status machine blocks skips and cancellation restores exactly once
+ok 16 - order status machine blocks skips and cancellation restores exactly once
+  ---
+  duration_ms: 130.2533
+  type: 'test'
+  ...
+# Subtest: paid orders require sequential fulfilment and paid-only revenue
+ok 17 - paid orders require sequential fulfilment and paid-only revenue
+  ---
+  duration_ms: 184.64
+  type: 'test'
+  ...
+# Subtest: JSON body, size limit, consent and auth throttle reject abuse
+ok 18 - JSON body, size limit, consent and auth throttle reject abuse
+  ---
+  duration_ms: 249.0687
+  type: 'test'
+  ...
+# Subtest: persistent orders, stock and receipt secret survive database reopen
+ok 19 - persistent orders, stock and receipt secret survive database reopen
+  ---
+  duration_ms: 64.7405
+  type: 'test'
+  ...
+# Subtest: expired unpaid reservations restore stock once while paid orders remain reserved
+ok 20 - expired unpaid reservations restore stock once while paid orders remain reserved
+  ---
+  duration_ms: 102.6173
+  type: 'test'
+  ...
+# Subtest: checkout clears an expired reservation before checking the next buyer stock
+ok 21 - checkout clears an expired reservation before checking the next buyer stock
+  ---
+  duration_ms: 7.696
+  type: 'test'
+  ...
+# Subtest: order pagination is bounded and reports use persisted status totals
+ok 22 - order pagination is bounded and reports use persisted status totals
+  ---
+  duration_ms: 359.7068
+  type: 'test'
+  ...
+# Subtest: schema one migrates on reopen and startup releases an old reservation once
+ok 23 - schema one migrates on reopen and startup releases an old reservation once
+  ---
+  duration_ms: 93.1178
+  type: 'test'
+  ...
+# Subtest: only the last valid forwarded address from a trusted local proxy controls auth limits
+ok 24 - only the last valid forwarded address from a trusted local proxy controls auth limits
+  ---
+  duration_ms: 1988.4845
+  type: 'test'
+  ...
+# Subtest: password hashes retain legacy account compatibility while new hashes state their cost
+ok 25 - password hashes retain legacy account compatibility while new hashes state their cost
+  ---
+  duration_ms: 268.0673
+  type: 'test'
+  ...
+# (node:30220) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: demo seed adds marked sample content once and preserves existing orders
+ok 26 - demo seed adds marked sample content once and preserves existing orders
+  ---
+  duration_ms: 104.4793
+  type: 'test'
+  ...
+# Subtest: demo seed refuses non-demo data and rolls back every sample write when inventory is empty
+ok 27 - demo seed refuses non-demo data and rolls back every sample write when inventory is empty
+  ---
+  duration_ms: 44.1145
+  type: 'test'
+  ...
+# Subtest: a later demo failure rolls back nested orders, stock and order events together
+ok 28 - a later demo failure rolls back nested orders, stock and order events together
+  ---
+  duration_ms: 43.5282
+  type: 'test'
+  ...
+# (node:24592) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: admin pages and API stay absent on public host; only admin host accepts an admin login
+ok 29 - admin pages and API stay absent on public host; only admin host accepts an admin login
+  ---
+  duration_ms: 155.6659
+  type: 'test'
+  ...
+# Subtest: customers cannot sign in or register on the admin host; copied customer cookies cannot authorize it
+ok 30 - customers cannot sign in or register on the admin host; copied customer cookies cannot authorize it
+  ---
+  duration_ms: 126.5785
+  type: 'test'
+  ...
+# Subtest: unknown hosts and forwarded-host spoofing cannot select the admin surface
+ok 31 - unknown hosts and forwarded-host spoofing cannot select the admin surface
+  ---
+  duration_ms: 49.8016
+  type: 'test'
+  ...
+# Subtest: admin writes require its own origin even when another origin is allowed for the shop
+ok 32 - admin writes require its own origin even when another origin is allowed for the shop
+  ---
+  duration_ms: 85.4386
+  type: 'test'
+  ...
+# Subtest: production fails closed until distinct DNS hosts and secure cookies are configured
+ok 33 - production fails closed until distinct DNS hosts and secure cookies are configured
+  ---
+  duration_ms: 84.9609
+  type: 'test'
+  ...
+# (node:11468) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: versioned assets gzip correctly, HEAD stays empty and ETag revalidates
+ok 34 - versioned assets gzip correctly, HEAD stays empty and ETag revalidates
+  ---
+  duration_ms: 68.6194
+  type: 'test'
+  ...
+# Subtest: SPA navigation serves HTML while missing data, hidden files and traversal stay denied
+ok 35 - SPA navigation serves HTML while missing data, hidden files and traversal stay denied
+  ---
+  duration_ms: 20.5559
+  type: 'test'
+  ...
+# Subtest: a directory link inside the static root cannot expose files outside it
+ok 36 - a directory link inside the static root cannot expose files outside it
+  ---
+  duration_ms: 14.5476
+  type: 'test'
+  ...
+# Subtest: production keeps security headers, secure cookies and the explicit write origin boundary
+ok 37 - production keeps security headers, secure cookies and the explicit write origin boundary
+  ---
+  duration_ms: 56.565
+  type: 'test'
+  ...
+1..37
+# tests 37
+# suites 0
+# pass 37
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 7285.592
+
+> autokala-store@1.1.1 test:frontend
+> vitest run --config vitest.config.ts
+
+
+ RUN  v5.0.5 C:/Users/Dear-OTCamp-User/Desktop/فروشگاه آنلاین لوازم خودرو
+
+
+ Test Files  8 passed (8)
+      Tests  29 passed (29)
+   Start at  15:28:35
+   Duration  18.86s (environment 62%, tests 22%, setup 11%, import 4%, transform 1%)
+
+    Isolate  8 workers spawned · ~1.50s startup each (spawn + environment, per file)
+             at least ~10.50s faster with isolate: false — reuses workers across files instead of one per file
+

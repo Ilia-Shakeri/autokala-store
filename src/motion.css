@@ -1,0 +1,31 @@
+:root { --ease-out: cubic-bezier(0.23, 1, 0.32, 1); --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1); }
+.site-icon { flex-shrink: 0; vertical-align: middle; transition: transform 150ms var(--ease-out), color 150ms ease; }
+.car-loading { display: inline-flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; color: var(--green); max-width: 100%; }
+.car-loading-scene { display: block; flex-shrink: 0; width: 120px; height: 44px; overflow: hidden; }
+.car-loading-label { font-size: 12px; line-height: 1.8; }
+.car-loading--inline { flex-direction: row; gap: 8px; color: inherit; vertical-align: middle; }
+.car-loading--inline .car-loading-scene { width: 52px; height: 22px; }
+.car-loading--inline .car-loading-label { font: inherit; }
+.car-loading--icon .car-loading-label { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.car-loading--icon .car-loading-scene { width: 38px; }
+.car-loading-body { animation: car-idle 1.2s var(--ease-in-out) infinite; }
+.car-loading-wheel { transform-box: fill-box; transform-origin: center; animation: car-wheel 1s linear infinite; }
+.car-loading-road { animation: car-road .8s linear infinite; opacity: .4; }
+@keyframes car-idle { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-1px); } }
+@keyframes car-wheel { to { transform: rotate(360deg); } }
+@keyframes car-road { to { transform: translateX(-20px); } }
+.heart.active .site-icon { fill: currentColor; }
+@media (hover: hover) and (pointer: fine) {
+  button:not(:disabled):hover > .site-icon { transform: translateY(-1px); }
+  .category-card:hover .category-symbol .site-icon { transform: translateY(-2px) rotate(-4deg); }
+  button:not(:disabled):hover > .icon-arrow { transform: translateX(-3px); }
+  button:not(:disabled):hover > .icon-search { transform: scale(1.06); }
+}
+button:not(:disabled):active > .site-icon { transform: scale(.94); }
+@media (prefers-reduced-motion: reduce) {
+  .site-icon { transition: color 150ms ease; }
+  .car-loading-body, .car-loading-wheel, .car-loading-road { animation: none; transform: none; }
+  .car-loading-scene { animation: car-pulse 1.8s linear infinite !important; }
+  button:not(:disabled):hover > .site-icon, button:not(:disabled):active > .site-icon, .category-card:hover .category-symbol .site-icon { transform: none; }
+}
+@keyframes car-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .65; } }

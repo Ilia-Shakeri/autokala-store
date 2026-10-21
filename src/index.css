@@ -1,5 +1,7 @@
 @import 'tailwindcss';
 @import '@fontsource-variable/vazirmatn';
+@import './motion.css';
+@import './product-detail.css';
 
 :root {
   --ink: #121612;
