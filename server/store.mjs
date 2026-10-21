@@ -44,9 +44,15 @@ export function createStore({ dbPath = process.env.DB_PATH || resolve('server/da
   `)
   const getMeta = (key) => db.prepare('SELECT value FROM meta WHERE key=?').get(key)?.value
   const setMeta = (key, value) => db.prepare('INSERT INTO meta(key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value').run(key, value)
+  let transactionDepth = 0
   const transaction = (fn) => {
-    db.exec('BEGIN IMMEDIATE')
-    try { const result = fn(); db.exec('COMMIT'); return result } catch (error) { db.exec('ROLLBACK'); throw error }
+    const depth = transactionDepth++
+    const savepoint = `store_tx_${depth}`
+    try {
+      db.exec(depth ? `SAVEPOINT ${savepoint}` : 'BEGIN IMMEDIATE')
+      try { const result = fn(); db.exec(depth ? `RELEASE SAVEPOINT ${savepoint}` : 'COMMIT'); return result }
+      catch (error) { db.exec(depth ? `ROLLBACK TO SAVEPOINT ${savepoint}; RELEASE SAVEPOINT ${savepoint}` : 'ROLLBACK'); throw error }
+    } finally { transactionDepth-- }
   }
   const schemaVersion = getMeta('schema_version')
   if (schemaVersion && !['1','2'].includes(schemaVersion)) { db.close(); throw new Error('Unsupported database schema version.') }
@@ -102,17 +108,18 @@ export function createStore({ dbPath = process.env.DB_PATH || resolve('server/da
     const shipping = subtotal >= config.freeShippingThreshold ? 0 : config.shippingFee
     return { items, subtotal, shipping, total: subtotal + shipping }
   }
-  const createOrder = ({ items, customer, note, idempotencyKey }, userId = null) => {
+  const createOrder = ({ items, customer, note, idempotencyKey, expectedTotal }, userId = null) => {
     expireReservations()
     return transaction(() => {
     const idempotencyHash = sha256(idempotencyKey)
-    const requestHash = sha256(JSON.stringify({ items, customer, note, userId }))
+    const requestHash = sha256(JSON.stringify({ items, customer, note, userId, expectedTotal }))
     const previous = db.prepare('SELECT * FROM orders WHERE idempotency_hash=?').get(idempotencyHash)
     if (previous) {
       if (previous.request_hash !== requestHash) throw new AppError(409, 'کلید سفارش تکراری است. درخواست تازه بسازید.')
       return { order: order(previous), receiptToken: receiptToken(previous.id), replayed: true }
     }
     const result = quote(items)
+    if (expectedTotal !== undefined && result.total !== expectedTotal) throw new AppError(409,'قیمت یا هزینه ارسال تغییر کرده؛ مبلغ را دوباره دریافت کنید.')
     const id = `AK-${randomBytes(8).toString('hex').toUpperCase()}`
     const now = new Date().toISOString()
     for (const item of result.items) {

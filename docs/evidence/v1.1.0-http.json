@@ -1,0 +1,90 @@
+{
+  "version": "1.1.0",
+  "measuredAt": "2026-10-21T11:28:04.894Z",
+  "scope": "Actual local server on port 3001; no credentials or customer records",
+  "results": [
+    {
+      "path": "/health/live",
+      "host": "127.0.0.1:3001",
+      "expected": 200,
+      "status": 200,
+      "pass": true,
+      "body": {
+        "live": true
+      }
+    },
+    {
+      "path": "/health/ready",
+      "host": "127.0.0.1:3001",
+      "expected": 200,
+      "status": 200,
+      "pass": true,
+      "body": {
+        "ready": true,
+        "staticBuilt": true
+      }
+    },
+    {
+      "path": "/api/context",
+      "host": "127.0.0.1:3001",
+      "expected": 200,
+      "status": 200,
+      "pass": true,
+      "body": {
+        "isAdminHost": false,
+        "publicOrigin": "http://127.0.0.1:3001"
+      }
+    },
+    {
+      "path": "/api/context",
+      "host": "localhost:3001",
+      "expected": 200,
+      "status": 200,
+      "pass": true,
+      "body": {
+        "isAdminHost": true,
+        "publicOrigin": "http://127.0.0.1:3001"
+      }
+    },
+    {
+      "path": "/admin",
+      "host": "127.0.0.1:3001",
+      "expected": 404,
+      "status": 404,
+      "pass": true,
+      "body": {
+        "error": "مسیر پیدا نشد."
+      }
+    },
+    {
+      "path": "/api/admin/overview",
+      "host": "127.0.0.1:3001",
+      "expected": 404,
+      "status": 404,
+      "pass": true,
+      "body": {
+        "error": "مسیر پیدا نشد."
+      }
+    },
+    {
+      "path": "/api/admin/overview",
+      "host": "localhost:3001",
+      "expected": 401,
+      "status": 401,
+      "pass": true,
+      "body": {
+        "error": "اول وارد شوید."
+      }
+    },
+    {
+      "path": "/api/catalog",
+      "host": "unlisted.test:3001",
+      "expected": 421,
+      "status": 421,
+      "pass": true,
+      "body": {
+        "error": "میزبان درخواست مجاز نیست."
+      }
+    }
+  ]
+}

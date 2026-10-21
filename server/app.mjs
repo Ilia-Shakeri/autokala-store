@@ -8,6 +8,7 @@ import { isIP } from 'node:net'
 import { createStore, AppError, sha256 } from './store.mjs'
 import * as valid from './validation.mjs'
 import { createSession, hashPassword, verifyPassword, sessionUser, sessionToken, sessionCookie, publicUser } from './auth.mjs'
+import { createHostBoundary } from './hosts.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)),'..')
 const MAX_BODY = 64 * 1024
@@ -26,7 +27,8 @@ function body(req) {
   })
 }
 
-export function createApp({ dbPath, seed = true, reservationTtlMs = 24*60*60*1000, distPath = resolve(root,'dist'), allowedOrigins = (process.env.ALLOWED_ORIGINS || '').split(',').filter(Boolean), production = process.env.NODE_ENV === 'production', trustProxy = process.env.TRUST_PROXY === 'true', secureCookies = process.env.SECURE_COOKIES === 'true', logger = console } = {}) {
+export function createApp({ dbPath, seed = true, reservationTtlMs = 24*60*60*1000, distPath = resolve(root,'dist'), allowedOrigins = (process.env.ALLOWED_ORIGINS || '').split(',').filter(Boolean), production = process.env.NODE_ENV === 'production', trustProxy = process.env.TRUST_PROXY === 'true', secureCookies = process.env.SECURE_COOKIES === 'true', publicHost = process.env.PUBLIC_HOST, adminHost = process.env.ADMIN_HOST, logger = console } = {}) {
+  const hostBoundary = createHostBoundary({ publicHost,adminHost,production,secureCookies })
   const store = createStore({ dbPath, seed, reservationTtlMs })
   const limits = new Map()
   const files = new Map()
@@ -85,13 +87,13 @@ export function createApp({ dbPath, seed = true, reservationTtlMs = 24*60*60*100
     const forwarded = String(req.headers['x-forwarded-for'] || '').split(',').at(-1)?.trim()
     return isIP(forwarded || '') ? forwarded : remote
   }
-  const checkOrigin = (req) => {
+  const checkOrigin = (req,isAdminHost) => {
     if (req.headers['sec-fetch-site'] === 'cross-site') throw new AppError(403,'مبدأ درخواست مجاز نیست.')
     const origin = req.headers.origin
     if (!origin) return
     const protocol = secureCookies || (trustedProxy(req) && req.headers['x-forwarded-proto'] === 'https') || req.socket.encrypted ? 'https' : 'http'
-    const ownOrigin = `${protocol}://${req.headers.host}`
-    if (origin !== ownOrigin && !originAllowlist.has(origin)) throw new AppError(403,'مبدأ درخواست مجاز نیست.')
+    const ownOrigin = new URL(`${protocol}://${req.headers.host}`).origin
+    if (origin !== ownOrigin && (isAdminHost || !originAllowlist.has(origin))) throw new AppError(403,'مبدأ درخواست مجاز نیست.')
   }
   const writeProduct = (input,id) => {
     const p = valid.product(input)
@@ -113,24 +115,32 @@ export function createApp({ dbPath, seed = true, reservationTtlMs = 24*60*60*100
     res.setHeader('Content-Security-Policy',"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'")
     if (secureCookies || (trustedProxy(req) && req.headers['x-forwarded-proto'] === 'https') || req.socket.encrypted) res.setHeader('Strict-Transport-Security','max-age=31536000')
     try {
+      const cookieSecure = secureCookies || Boolean(req.socket.encrypted) || (trustedProxy(req) && req.headers['x-forwarded-proto'] === 'https')
+      const context = hostBoundary(req,cookieSecure ? 'https' : 'http')
+      const { isAdminHost } = context
       const url = new URL(req.url,'http://localhost')
       const path = url.pathname
       const method = req.method
+      let decodedPath
+      try { decodedPath = decodeURIComponent(path) } catch { throw new AppError(400,'نشانی درست نیست.') }
+      if (!isAdminHost && /^\/(?:admin(?:\/|$)|api\/admin(?:\/|$))/i.test(decodedPath)) throw new AppError(404,'مسیر پیدا نشد.')
       if (path === '/health/live' && method === 'GET') return send(res,200,{ live:true })
       if (path === '/health/ready' && method === 'GET') { store.db.prepare('SELECT 1').get(); return send(res,200,{ ready:true,staticBuilt:existsSync(resolve(distPath,'index.html')) }) }
       if (!path.startsWith('/api/')) return serveStatic(req,res,path)
       const ip = clientAddress(req)
       rateLimit(`all:${ip}`,300,60000)
-      if (!['GET','HEAD'].includes(method)) checkOrigin(req)
-      const user = sessionUser(store,req)
-      const cookieSecure = secureCookies || Boolean(req.socket.encrypted) || (trustedProxy(req) && req.headers['x-forwarded-proto'] === 'https')
+      if (!['GET','HEAD'].includes(method)) checkOrigin(req,isAdminHost)
+      const user = sessionUser(store,req,isAdminHost,cookieSecure)
+      if (path === '/api/context' && method === 'GET') return send(res,200,context)
       if (path === '/api/catalog' && method === 'GET') {
+        sweepReservations()
         if (!catalogCache) { const value = store.catalog(); catalogCache = {value,etag:`"${sha256(JSON.stringify(value))}"`} }
         if (req.headers['if-none-match'] === catalogCache.etag) { res.writeHead(304,{'ETag':catalogCache.etag,'Cache-Control':'no-cache'}); return res.end() }
         return send(res,200,catalogCache.value,{'ETag':catalogCache.etag,'Cache-Control':'no-cache'})
       }
-      if (path === '/api/session' && method === 'GET') return send(res,200,{user})
+      if (path === '/api/session' && method === 'GET') return send(res,200,{user,isAdminHost})
       if ((path === '/api/auth/register' || path === '/api/auth/login') && method === 'POST') {
+        if (isAdminHost && path.endsWith('/register')) throw new AppError(404,'مسیر پیدا نشد.')
         rateLimit(`auth:${ip}`,15,15*60000)
         const input = await body(req)
         const email = valid.email(input.email)
@@ -144,16 +154,16 @@ export function createApp({ dbPath, seed = true, reservationTtlMs = 24*60*60*100
           catch (error) { if (error.message.includes('UNIQUE')) throw new AppError(409,'ثبت حساب انجام نشد. ایمیل را بررسی کنید.'); throw error }
         } else {
           row = store.db.prepare('SELECT * FROM users WHERE email=?').get(email)
-          if (!(await verifyPassword(password,row?.password_hash))) throw new AppError(401,'ایمیل یا رمز درست نیست.')
+          if (!(await verifyPassword(password,row?.password_hash)) || row.role !== (isAdminHost ? 'admin' : 'customer')) throw new AppError(401,'ایمیل یا رمز درست نیست.')
         }
-        const token = createSession(store,row.id)
-        return send(res,path.endsWith('/register') ? 201 : 200,{user:publicUser(row)},{'Set-Cookie':sessionCookie(token,cookieSecure)})
+        const token = createSession(store,row.id,isAdminHost)
+        return send(res,path.endsWith('/register') ? 201 : 200,{user:publicUser(row)},{'Set-Cookie':sessionCookie(token,cookieSecure,isAdminHost)})
       }
       if (path === '/api/auth/logout' && method === 'POST') {
         await body(req)
-        const token = sessionToken(req)
+        const token = sessionToken(req,isAdminHost,cookieSecure)
         if (token) store.db.prepare('DELETE FROM sessions WHERE token_hash=?').run(sha256(token))
-        return send(res,200,{ok:true},{'Set-Cookie':sessionCookie('',cookieSecure)})
+        return send(res,200,{ok:true},{'Set-Cookie':sessionCookie('',cookieSecure,isAdminHost)})
       }
       if (path === '/api/quote' && method === 'POST') { const input = await body(req); sweepReservations(); return send(res,200,store.quote(valid.items(input.items))) }
       if (path === '/api/orders' && method === 'POST') {
@@ -161,8 +171,9 @@ export function createApp({ dbPath, seed = true, reservationTtlMs = 24*60*60*100
         const input = await body(req)
         const idempotencyKey = valid.text(input.idempotencyKey,'کلید سفارش',16,128)
         if (!/^[a-zA-Z0-9_-]+$/.test(idempotencyKey)) throw new AppError(400,'کلید سفارش درست نیست.')
+        const expectedTotal = input.expectedTotal === undefined ? undefined : valid.integer(input.expectedTotal,'مبلغ تأییدشده',1,Number.MAX_SAFE_INTEGER)
         sweepReservations()
-        const result = store.createOrder({items:valid.items(input.items),customer:valid.customer(input.customer),note:valid.text(input.note ?? '','یادداشت',0,1000),idempotencyKey},user?.id ?? null)
+        const result = store.createOrder({items:valid.items(input.items),customer:valid.customer(input.customer),note:valid.text(input.note ?? '','یادداشت',0,1000),idempotencyKey,expectedTotal},user?.id ?? null)
         invalidate()
         return send(res,201,{order:result.order,receiptToken:result.receiptToken},result.replayed ? {'Idempotency-Replayed':'true'} : {})
       }
@@ -268,7 +279,8 @@ export function createApp({ dbPath, seed = true, reservationTtlMs = 24*60*60*100
     }
     const headers = {'Content-Type':entry.type,'ETag':entry.etag,'Cache-Control':target.includes(`${sep}assets${sep}`) ? 'public, max-age=31536000, immutable' : 'no-cache','Vary':'Accept-Encoding'}
     if (req.headers['if-none-match'] === entry.etag) { res.writeHead(304,headers); return res.end() }
-    const compress = entry.gzip && /\bgzip\b/.test(req.headers['accept-encoding'] || '') && !/\bgzip\s*;\s*q=0(?:\D|$)/.test(req.headers['accept-encoding'] || '')
+    const acceptsGzip = String(req.headers['accept-encoding'] || '').split(',').some((entry) => /^gzip(?:\s*;\s*q=(?:0\.\d*[1-9]\d*|1(?:\.0*)?))?$/i.test(entry.trim()))
+    const compress = entry.gzip && acceptsGzip
     const bytes = compress ? entry.gzip : entry.bytes
     if (compress) headers['Content-Encoding'] = 'gzip'
     res.writeHead(200,{...headers,'Content-Length':bytes.length})

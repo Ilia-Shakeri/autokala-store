@@ -61,6 +61,12 @@ test('versioned assets gzip correctly, HEAD stays empty and ETag revalidates', a
   assert.equal(plain.status, 200)
   assert.equal(plain.headers['content-encoding'], undefined)
   assert.equal(plain.body.toString(), javascript)
+  const fractional = await f.request(path, { headers: { 'Accept-Encoding': 'br, gzip;q=0.5' } })
+  assert.equal(fractional.status,200)
+  assert.equal(fractional.headers['content-encoding'],'gzip')
+  assert.equal(gunzipSync(fractional.body).toString(),javascript)
+  const disabled = await f.request(path, { headers: { 'Accept-Encoding': 'gzip;q=0.000' } })
+  assert.equal(disabled.headers['content-encoding'],undefined)
   const head = await f.request(path, { method: 'HEAD', headers: { 'Accept-Encoding': 'gzip' } })
   assert.equal(head.status, 200)
   assert.equal(head.body.length, 0)
@@ -101,8 +107,9 @@ test('a directory link inside the static root cannot expose files outside it', a
 
 test('production keeps security headers, secure cookies and the explicit write origin boundary', async (t) => {
   const allowed = 'https://shop.example.test'
-  const f = await fixture(t, { production: true, secureCookies: true, allowedOrigins: [allowed] })
-  const page = await f.request('/', { headers: { Accept: 'text/html' } })
+  const f = await fixture(t, { production: true, secureCookies: true, publicHost: 'shop.example.test', adminHost: 'admin.shop.example.test', allowedOrigins: [allowed] })
+  const host = { Host: 'shop.example.test' }
+  const page = await f.request('/', { headers: { ...host, Accept: 'text/html' } })
   assert.equal(page.status, 200)
   assert.equal(page.headers['x-content-type-options'], 'nosniff')
   assert.equal(page.headers['x-frame-options'], 'DENY')
@@ -112,10 +119,10 @@ test('production keeps security headers, secure cookies and the explicit write o
   assert.match(page.headers['content-security-policy'], /connect-src 'self'/)
   assert.equal(/https?:|unsafe-eval/.test(page.headers['content-security-policy']), false)
   const quote = { items: [{ productId: 1, quantity: 1 }] }
-  assert.equal((await f.request('/api/quote', { method: 'POST', data: quote, headers: { Origin: 'http://localhost:8443' } })).status, 403)
-  assert.equal((await f.request('/api/quote', { method: 'POST', data: quote, headers: { Origin: 'https://wrong.example.test' } })).status, 403)
-  assert.equal((await f.request('/api/quote', { method: 'POST', data: quote, headers: { Origin: allowed } })).status, 200)
-  const registered = await f.request('/api/auth/register', { method: 'POST', headers: { Origin: allowed }, data: { name: 'کاربر آزمون', email: 'secure@example.test', password: 'static-test-password-1234' } })
+  assert.equal((await f.request('/api/quote', { method: 'POST', data: quote, headers: { ...host, Origin: 'http://localhost:8443' } })).status, 403)
+  assert.equal((await f.request('/api/quote', { method: 'POST', data: quote, headers: { ...host, Origin: 'https://wrong.example.test' } })).status, 403)
+  assert.equal((await f.request('/api/quote', { method: 'POST', data: quote, headers: { ...host, Origin: allowed } })).status, 200)
+  const registered = await f.request('/api/auth/register', { method: 'POST', headers: { ...host, Origin: allowed }, data: { name: 'کاربر آزمون', email: 'secure@example.test', password: 'static-test-password-1234' } })
   assert.equal(registered.status, 201)
   const cookie = registered.headers['set-cookie'].join(';')
   assert.match(cookie, /HttpOnly/)

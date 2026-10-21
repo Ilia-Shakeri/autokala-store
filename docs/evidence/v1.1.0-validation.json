@@ -1,0 +1,32 @@
+{
+  "version": "1.1.0",
+  "date": "2026-10-21",
+  "scope": "Local release; observed command results and manual browser acceptance. No public deployment or live payment.",
+  "automated": {
+    "command": "npm.cmd test",
+    "exitCode": 0,
+    "backend": {"tests": 37, "passed": 37, "failed": 0, "skipped": 0, "cancelled": 0, "durationMs": 11701.5307},
+    "frontend": {"files": 7, "tests": 27, "passed": 27, "failed": 0, "durationSeconds": 26.20},
+    "totalPassed": 64
+  },
+  "build": {"command": "npm.cmd run build", "exitCode": 0, "includesTypecheck": true, "manifest": "../build-manifest-1.1.0.json"},
+  "dependencyAudit": {
+    "command": "npm.cmd audit --registry=https://registry.npmjs.org --json",
+    "exitCode": 0,
+    "dependencies": 211,
+    "knownVulnerabilities": 0,
+    "note": "Configured mirror failed with account credit 402; successful audit used official registry."
+  },
+  "http": {"probes": 8, "passed": 8, "receipt": "v1.1.0-http.json"},
+  "browser": {
+    "publicOrigin": "http://127.0.0.1:3001",
+    "adminOrigin": "http://localhost:3001",
+    "mutationTestOrigin": "http://127.0.0.1:3002",
+    "isolatedDatabase": true,
+    "productImagesLoaded": 12,
+    "mobile": {"innerWidth": 390, "documentScrollWidth": 375, "horizontalOverflow": false},
+    "passed": ["themed dropdown", "vehicle filter", "all photo loads", "SKU search", "mobile dropdown and product details", "persistent cart after reload", "guest checkout pending payment", "receipt storage and tracking", "separate admin login", "admin product edit persisted", "modal dropdown Escape keeps modal open", "demo dashboard and report"],
+    "storeAndCheckoutConsoleWarningsOrErrors": 0
+  },
+  "limitations": ["No public domain", "Payment, shipping and contact remain explicit placeholders", "Photos illustrative; final brand packaging not verified", "Local sequential API timing only; no Internet or browser vitals or simultaneous checkout capacity claim", "Main local database has no default administrator; owner chooses password through local CLI"]
+}

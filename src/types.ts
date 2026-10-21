@@ -1,4 +1,5 @@
 export type User = { id: number; name: string; email: string; role: 'admin' | 'customer' }
+export type HostContext = {isAdminHost:boolean;publicOrigin:string}
 export type Product = { id: number; name: string; sku: string; brand: string; price: number; oldPrice?: number | null; category: string; label: string; visual: string; color: string; description: string; stock: number; vehicles: string[] }
 export type Category = { id: number; title: string; icon: string; count: number }
 export type Vehicle = { brand: string; model: string; years: number[] }

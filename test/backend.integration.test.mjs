@@ -17,14 +17,14 @@ async function fixture(t, options = {}) {
   let closed = false
   const close = async () => { if (!closed) { closed = true; await app.close() } }
   t.after(close)
-  function client(initialCookie = '') {
+  function client(initialCookie = '', host = '') {
     let cookie = initialCookie
     return {
       get cookie() { return cookie },
       async request(path, { method = 'GET', data, headers = {}, raw } = {}) {
-        const response = await fetch(`${base}${path}`, {
+        const response = await fetch(`${host ? `http://${host}` : base}${path}`, {
           method,
-          headers: { ...(cookie ? { Cookie: cookie } : {}), ...(data !== undefined ? { 'Content-Type': 'application/json' } : {}), ...headers },
+          headers: { ...(host ? { Host: host } : {}), ...(cookie ? { Cookie: cookie } : {}), ...(data !== undefined ? { 'Content-Type': 'application/json' } : {}), ...headers },
           body: raw ?? (data !== undefined ? JSON.stringify(data) : undefined),
           signal: AbortSignal.timeout(10000),
         })
@@ -39,7 +39,7 @@ async function fixture(t, options = {}) {
     const email = `admin-${randomUUID()}@example.test`
     const password = `test-${randomUUID()}`
     app.store.db.prepare('INSERT INTO users(name,email,password_hash,role,created_at) VALUES (?,?,?,?,?)').run('مدیر آزمون', email, await hashPassword(password), 'admin', new Date().toISOString())
-    const result = client()
+    const result = client('',`localhost:${app.server.address().port}`)
     const login = await result.request('/api/auth/login', { method: 'POST', data: { email, password } })
     assert.equal(login.status, 200)
     return result
@@ -133,6 +133,32 @@ test('insufficient stock rolls the full order back', async (t) => {
   assert.equal(f.store.db.prepare('SELECT COUNT(*) AS n FROM orders').get().n, 0)
 })
 
+test('checkout rejects a stale displayed total without reserving stock and permits an explicit refreshed total', async (t) => {
+  const f = await fixture(t)
+  const c = f.client()
+  const admin = await f.admin()
+  const items = [{ productId:1,quantity:1 }]
+  const initial = await c.request('/api/quote',{method:'POST',data:{items}})
+  const stock = f.store.catalog().products[0].stock
+  const config = f.store.settings()
+  assert.equal((await admin.request('/api/admin/settings',{method:'PATCH',data:{shippingFee:config.shippingFee+1000}})).status,200)
+  const input = orderInput(items,{expectedTotal:initial.data.total})
+  const stale = await c.request('/api/orders',{method:'POST',data:input})
+  assert.equal(stale.status,409)
+  assert.match(stale.data.error,/مبلغ را دوباره/)
+  assert.equal(f.store.catalog().products[0].stock,stock)
+  assert.equal(f.store.db.prepare('SELECT COUNT(*) AS n FROM orders').get().n,0)
+  for (const expectedTotal of [-1,0,1.5,'1',null,Number.MAX_SAFE_INTEGER+1]) assert.equal((await c.request('/api/orders',{method:'POST',data:{...input,expectedTotal}})).status,400)
+  const fresh = await c.request('/api/quote',{method:'POST',data:{items}})
+  const accepted = await c.request('/api/orders',{method:'POST',data:{...input,expectedTotal:fresh.data.total}})
+  assert.equal(accepted.status,201)
+  assert.equal(accepted.data.order.total,fresh.data.total)
+  assert.equal(f.store.catalog().products[0].stock,stock-1)
+  const replay = await c.request('/api/orders',{method:'POST',data:{...input,expectedTotal:fresh.data.total}})
+  assert.equal(replay.headers.get('idempotency-replayed'),'true')
+  assert.equal(replay.data.order.id,accepted.data.order.id)
+})
+
 test('concurrent buyers cannot sell the last unit twice', async (t) => {
   const f = await fixture(t)
   f.store.db.prepare('UPDATE products SET stock=1 WHERE id=1').run()
@@ -167,13 +193,13 @@ test('guest order data requires its receipt token and does not leak by identifie
 test('customer login, own orders, role boundary and logout work', async (t) => {
   const f = await fixture(t)
   const anonymous = f.client()
-  assert.equal((await anonymous.request('/api/admin/overview')).status, 401)
+  assert.equal((await anonymous.request('/api/admin/overview')).status, 404)
   const owner = f.client()
   const credentials = await register(owner)
   const session = await owner.request('/api/session')
   assert.equal(session.data.user.email, credentials.email)
-  assert.equal((await owner.request('/api/admin/overview')).status, 403)
-  assert.equal((await owner.request('/api/admin/settings', { method: 'PATCH', data: { shippingFee: 0 } })).status, 403)
+  assert.equal((await owner.request('/api/admin/overview')).status, 404)
+  assert.equal((await owner.request('/api/admin/settings', { method: 'PATCH', data: { shippingFee: 0 } })).status, 404)
   const created = await owner.request('/api/orders', { method: 'POST', data: orderInput() })
   assert.equal(created.status, 201)
   assert.equal((await owner.request(`/api/orders/${created.data.order.id}`)).status, 200)

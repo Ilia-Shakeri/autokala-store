@@ -1,0 +1,117 @@
+{
+  "version": "1.1.0",
+  "runtime": "v22.23.0",
+  "createdAt": "2026-10-21T11:32:10.1054805Z",
+  "files": [
+    {
+      "path": "assets/AdminPanel-D7Nxvyqx.js",
+      "bytes": 31363,
+      "sha256": "a73a7d0d670578bec69522c5fcfb4da771f85fe9cb2e432227fed6f40e657052"
+    },
+    {
+      "path": "assets/AdminPanel-kAA4rLMD.css",
+      "bytes": 9496,
+      "sha256": "1ee5c76182916718c306ccb0faaea2f71bd5a4bcb0511e01604952dc8399408c"
+    },
+    {
+      "path": "assets/index-BJpdYE6R.js",
+      "bytes": 367537,
+      "sha256": "0068ba94140e8dbc7778fbbfb7142a2928432cbd424ccf27f2ef4fb5a5149640"
+    },
+    {
+      "path": "assets/index-ElNMxbIB.css",
+      "bytes": 47545,
+      "sha256": "29bf245ed875c998b4e31d4589f9feb1a77786b8165706302d278b7e0899bfe3"
+    },
+    {
+      "path": "assets/vazirmatn-arabic-wght-normal-Cafbb7Zc.woff2",
+      "bytes": 46308,
+      "sha256": "84a382e46c30fb4f73d0e3800c16d0af15888e2731e57fa5f93e2c29a2c6a957"
+    },
+    {
+      "path": "assets/vazirmatn-latin-ext-wght-normal-tDTa1Fj6.woff2",
+      "bytes": 21860,
+      "sha256": "21529facfd236f6be527e4353623bdb889c96a7ebb7db1e148e28406be0ea004"
+    },
+    {
+      "path": "assets/vazirmatn-latin-wght-normal-BFexNX-K.woff2",
+      "bytes": 34524,
+      "sha256": "d29c041cd4294af893cf3c01dfab6d47202c667ab55d702f68782599918c651d"
+    },
+    {
+      "path": "favicon.svg",
+      "bytes": 3235,
+      "sha256": "84856b1fa530b1ef445f1ea2c8eba3fe6518f6f90f8ef21f15177644ddeaeac5"
+    },
+    {
+      "path": "garage.webp",
+      "bytes": 67748,
+      "sha256": "a0fd5bab7b3f5ed865fd1ddefcf9f2419e22f60a2705f8eeb85fefa3c366aa1d"
+    },
+    {
+      "path": "index.html",
+      "bytes": 1146,
+      "sha256": "eee7330f7318149b13e708a0a790e9908dc5f5144088810cca8f30265d307ca5"
+    },
+    {
+      "path": "products/air-filter-9a4f3bde4f.jpg",
+      "bytes": 48461,
+      "sha256": "9a4f3bde4fcb9d96b5084a47cd1ed04888e9d3d7ef422eb3d56bfea818e93308"
+    },
+    {
+      "path": "products/brake-pads-16c9e6f544.jpg",
+      "bytes": 28205,
+      "sha256": "16c9e6f544fb50be171daefce0a95afac32aa3839323f59148903fc1682552aa"
+    },
+    {
+      "path": "products/car-shampoo-609b643a8b.jpg",
+      "bytes": 41259,
+      "sha256": "609b643a8b58797cb2aa5b2751e4704b27a977209db90a2302c31f8f4b5604b1"
+    },
+    {
+      "path": "products/coolant-759394985e.jpg",
+      "bytes": 53392,
+      "sha256": "759394985ec9636290c265b2d34c1195a8e6377849f1a8f58fc46007310b969c"
+    },
+    {
+      "path": "products/credits.json",
+      "bytes": 9345,
+      "sha256": "5586a9a2b42e3e8ef74f4177d1936433a5a7eeae4bfaa4b5e5374b46dd8fd2a6"
+    },
+    {
+      "path": "products/glass-cleaner-f24e67c58a.jpg",
+      "bytes": 47864,
+      "sha256": "f24e67c58a059d3a0959609b4a9338413d072927bd2e6837e41a1c1f803a13b6"
+    },
+    {
+      "path": "products/oil-e0a40c654b.jpg",
+      "bytes": 27984,
+      "sha256": "e0a40c654b15faf35db229a783ae9127ef9983c7fabac69da4678302a98b8c33"
+    },
+    {
+      "path": "products/oil-filter-47b06c3a9f.jpg",
+      "bytes": 48527,
+      "sha256": "47b06c3a9fce19364c99813eb92aafbd2fe7fdea5f3dc2aa13611e574badb4bd"
+    },
+    {
+      "path": "products/spark-plug-64b4f0dbbc.jpg",
+      "bytes": 20348,
+      "sha256": "64b4f0dbbc5bca3fa7115dc08e1e865f37ea31ec6fd0af2ddcde61c6ff4c32d7"
+    },
+    {
+      "path": "products/spark-short-36d04bf4b9.jpg",
+      "bytes": 55915,
+      "sha256": "36d04bf4b9160ecd6b6291aacbe151f56134fb247d492a66820bc6395b740303"
+    },
+    {
+      "path": "products/wiper-018c7dbbd1.jpg",
+      "bytes": 20655,
+      "sha256": "018c7dbbd109597184f162705e4cf647c6d268785dc17c80177e1f0998526cd2"
+    },
+    {
+      "path": "robots.txt",
+      "bytes": 26,
+      "sha256": "331ea9090db0c9f6f597bd9840fd5b171830f6e0b3ba1cb24dfa91f0c95aedc1"
+    }
+  ]
+}
