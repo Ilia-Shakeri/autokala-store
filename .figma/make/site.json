@@ -1,5 +1,7 @@
 {
-  "description": "An Iranian e-commerce platform offering automotive consumables with a user-friendly RTL interface, animated design, and a robust admin panel for managing products and orders.",
+  "title": "اتوکالا | لوازم مصرفی خودرو",
+  "language": "fa",
+  "description": "انتخاب لوازم مصرفی خودرو، بررسی سازگاری، ثبت سفارش و پیگیری خرید در اتوکالا.",
   "robots": {
     "index": false
   },

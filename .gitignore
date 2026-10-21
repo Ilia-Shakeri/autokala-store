@@ -9,7 +9,15 @@ vite.config.*.timestamp-*
 *-debug.log*
 logs/
 *.log
-.claude-replay.*
+data/
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+backups/
+test-results/
+.env.local
+!.env.example
+.*-replay.*
 .tmp-*
 /.figma/design-context/
 

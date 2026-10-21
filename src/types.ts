@@ -1,0 +1,11 @@
+export type User = { id: number; name: string; email: string; role: 'admin' | 'customer' }
+export type Product = { id: number; name: string; sku: string; brand: string; price: number; oldPrice?: number | null; category: string; label: string; visual: string; color: string; description: string; stock: number; vehicles: string[] }
+export type Category = { id: number; title: string; icon: string; count: number }
+export type Vehicle = { brand: string; model: string; years: number[] }
+export type Settings = { storeName: string; shippingFee: number; freeShippingThreshold: number; paymentMode: 'manual'; contactEmail?: string; contactPhone?: string; demo: boolean }
+export type Catalog = { products: Product[]; categories: Category[]; vehicles: Vehicle[]; settings: Settings }
+export type CartItem = { productId: number; quantity: number }
+export type Customer = { name: string; email: string; phone: string; address: string; postalCode: string }
+export type Order = { id: string; customer: Customer; items: {productId: number; name: string; price: number; quantity: number; lineTotal: number}[]; subtotal: number; shipping: number; total: number; status: string; createdAt: string; expiresAt?: string | null }
+export type Overview = { metrics: {revenue: number; orders: number; lowStock: number; customers: number}; orders: Order[]; products: Product[]; categories: Category[]; subscribers: unknown[] }
+export const statusLabels: Record<string, string> = { pending_payment: 'در انتظار پرداخت', paid: 'پرداخت تأیید شده', processing: 'در حال آماده‌سازی', shipped: 'ارسال شده', completed: 'تحویل شده', cancelled: 'لغو شده' }

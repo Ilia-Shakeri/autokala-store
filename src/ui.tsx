@@ -74,6 +74,9 @@ export function ProductVisual({ type }: { type: string }) {
       {type === 'filter' && <><span className="filter-top" /><span className="filter-body" /><span className="filter-lines" /></>}
       {type === 'brake' && <><span className="brake-disc" /><span className="brake-pad" /></>}
       {type === 'coolant' && <><span className="coolant-handle" /><span className="coolant-body">۴ فصل</span></>}
+      {type === 'spark' && <><span className="spark-tip"/><span className="spark-body"/><span className="spark-base"/></>}
+      {type === 'wiper' && <><span className="wiper-blade"/><span className="wiper-blade second"/></>}
+      {type === 'spray' && <><span className="spray-head"/><span className="spray-neck"/><span className="spray-body">AUTO<br/>CARE</span></>}
     </div>
   )
 }
