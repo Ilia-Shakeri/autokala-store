@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join, resolve, sep } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { createApp } from '../server/app.mjs'
-import { hashPassword } from '../server/auth.mjs'
+import { hashPassword, verifyPassword } from '../server/auth.mjs'
 
 const customer = { name: 'خریدار آزمون', email: 'buyer@example.test', phone: '09123456789', address: 'تهران، خیابان آزمون، پلاک ۱۲', postalCode: '1234567890' }
 const orderInput = (items = [{ productId: 1, quantity: 1 }], extra = {}) => ({ items, customer, note: '', idempotencyKey: randomUUID(), ...extra })
@@ -358,14 +358,37 @@ test('order pagination is bounded and reports use persisted status totals', asyn
   assert.equal((await admin.request('/api/admin/orders?limit=201')).status, 400)
   assert.equal((await admin.request('/api/admin/orders?offset=-1')).status, 400)
   assert.equal((await owner.request('/api/orders?offset=-1')).status, 400)
+  const pending = await admin.request('/api/admin/orders?status=pending_payment&limit=1')
+  assert.equal(pending.status, 200)
+  assert.equal(pending.data.orders.length, 1)
+  assert.equal(pending.data.orders[0].status, 'pending_payment')
+  assert.equal(pending.data.pagination.total, 2)
+  const exact = await admin.request(`/api/admin/orders?status=paid&query=${encodeURIComponent(orders[0].id)}`)
+  assert.equal(exact.status, 200)
+  assert.equal(exact.data.orders[0].id, orders[0].id)
+  assert.equal(exact.data.pagination.total, 1)
+  assert.equal((await admin.request('/api/admin/orders?status=wrong')).status, 400)
+  assert.equal((await admin.request('/api/admin/orders?query=no-such-order')).data.pagination.total, 0)
+  assert.equal((await owner.request('/api/subscribe', { method: 'POST', data: { phone: customer.phone, consent: true } })).status, 201)
+  const midnight = new Date(Date.now() - 24 * 60 * 60 * 1000)
+  midnight.setUTCHours(21, 30, 0, 0)
+  f.store.db.prepare('UPDATE orders SET created_at=? WHERE id=?').run(midnight.toISOString(), orders[0].id)
+  const tehranDate = new Date(midnight.getTime() + 3.5 * 60 * 60 * 1000).toISOString().slice(0, 10)
   const overview = await admin.request('/api/admin/overview?offset=0&limit=2')
   assert.equal(overview.status, 200)
   assert.equal(overview.data.orders.length, 2)
   assert.equal(overview.data.pagination.total, 4)
   assert.equal(overview.data.metrics.revenue, orders[0].total)
+  assert.equal(overview.data.metrics.subscribers, 1)
   assert.equal(overview.data.reports.byStatus.find(row => row.status === 'paid').count, 1)
   assert.equal(overview.data.reports.byStatus.find(row => row.status === 'cancelled').count, 1)
   assert.equal(overview.data.reports.byDay.reduce((sum, row) => sum + row.total, 0), orders[0].total)
+  assert.equal(overview.data.reports.byDay.find(row => row.date === tehranDate).total, orders[0].total)
+  const filtered = await admin.request('/api/admin/overview?status=cancelled')
+  assert.equal(filtered.data.pagination.total, 1)
+  assert.equal(filtered.data.metrics.orders, 4)
+  assert.equal(filtered.data.metrics.revenue, orders[0].total)
+  assert.equal(filtered.data.reports.byStatus.find(row => row.status === 'paid').count, 1)
 })
 
 test('schema one migrates on reopen and startup releases an old reservation once', async (t) => {
@@ -402,4 +425,31 @@ test('schema one migrates on reopen and startup releases an old reservation once
   opened.push(third)
   assert.equal(third.store.catalog().products[0].stock, before)
   assert.equal(third.store.db.prepare('SELECT COUNT(*) AS n FROM order_events WHERE order_id=?').get(created.data.order.id).n, 2)
+})
+
+test('only the last valid forwarded address from a trusted local proxy controls auth limits', async (t) => {
+  const trusted = await fixture(t, { trustProxy: true })
+  const wrongLogin = { email: 'missing@example.test', password: 'wrong-password-long' }
+  for (let i = 0; i < 15; i++) {
+    const result = await trusted.client().request('/api/auth/login', { method: 'POST', data: wrongLogin, headers: { 'X-Forwarded-For': `198.51.100.${i + 1}, 203.0.113.10` } })
+    assert.equal(result.status, 401)
+  }
+  assert.equal((await trusted.client().request('/api/auth/login', { method: 'POST', data: wrongLogin, headers: { 'X-Forwarded-For': '192.0.2.250, 203.0.113.10' } })).status, 429)
+  assert.equal((await trusted.client().request('/api/auth/login', { method: 'POST', data: wrongLogin, headers: { 'X-Forwarded-For': '192.0.2.250, 203.0.113.11' } })).status, 401)
+  const untrusted = await fixture(t, { trustProxy: false })
+  for (let i = 0; i < 15; i++) {
+    assert.equal((await untrusted.client().request('/api/auth/login', { method: 'POST', data: wrongLogin, headers: { 'X-Forwarded-For': `203.0.113.${i + 1}` } })).status, 401)
+  }
+  assert.equal((await untrusted.client().request('/api/auth/login', { method: 'POST', data: wrongLogin, headers: { 'X-Forwarded-For': '203.0.113.200' } })).status, 429)
+})
+
+test('password hashes retain legacy account compatibility while new hashes state their cost', async () => {
+  const password = `test-${randomUUID()}`
+  const encoded = await hashPassword(password)
+  assert.match(encoded, /^scrypt\$16384\$8\$1\$/)
+  const legacy = encoded.split('$').slice(-2).join(':')
+  assert.equal(await verifyPassword(password, encoded), true)
+  assert.equal(await verifyPassword(password, legacy), true)
+  assert.equal(await verifyPassword('wrong-password-long', legacy), false)
+  assert.equal(await verifyPassword(password, 'broken:hash'), false)
 })

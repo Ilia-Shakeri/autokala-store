@@ -23,7 +23,7 @@
 | GET | `/api/orders/:id` | `{order}`؛ توکن مهمان در هدر `X-Receipt-Token` |
 | POST | `/api/subscribe` | `{phone,consent:true}`؛ پاسخ ۲۰۱، `{ok:true,message}`؛ ارسال پیام وصل نیست |
 | GET | `/api/admin/overview?offset=0&limit=200` | مدیر؛ `{metrics,orders,products,categories,subscribers,reports,pagination}` |
-| GET | `/api/admin/orders?offset=0&limit=200` | مدیر؛ `{orders,pagination}` |
+| GET | `/api/admin/orders?offset=0&limit=200` | مدیر؛ `{orders,pagination}`؛ فیلتر `query` و `status` اختیاری |
 | POST | `/api/admin/products` | مدیر؛ کالای کامل بدون شناسه؛ پاسخ ۲۰۱، `{product}` |
 | PATCH | `/api/admin/products/:id` | مدیر؛ فیلد تغییر؛ پاسخ `{product}` |
 | POST | `/api/admin/categories` | مدیر؛ `{title,icon}`؛ پاسخ ۲۰۱، `{category}` |
@@ -33,7 +33,7 @@
 - [بدنه]: نوشتن با `Content-Type: application/json`. سقف ۶۴ کیلوبایت. کل بدنه، object باشد.
 - [حساب]: نام ۲ تا ۱۲۰ کاراکتر. رمز ۱۲ تا ۱۲۸ کاراکتر. ثبت، همیشه نقش `customer` دهد. مدیر فقط با فرمان محلی ساخته شود.
 - [کاربر]: `{id,name,email,role}`. هش رمز و توکن نشست در پاسخ عمومی نیاید.
-- [مشتری]: `{name,email,phone,address,postalCode}`. نشانی ۱۰ تا ۱۰۰۰ کاراکتر. شماره ایران `09...`، `+98...` یا `0098...`. کد پستی ۱۰ رقم غیرتکراری. رقم فارسی و عربی عادی شود.
+- [مشتری]: `{name,email,phone,address,postalCode}`. نشانی ۱۰ تا ۱۰۰۰ کاراکتر. شماره ایران `09...`، `+98...` یا `0098...`. کد پستی ۱۰ رقم و نه ده رقم یکسان. رقم فارسی و عربی عادی شود.
 - [کالا]: `{id,name,sku,brand,price,oldPrice?,category,label,visual,color,description,stock,vehicles}`. کد یکتا، دسته با عنوان دقیق. قیمت ۱ تا یک میلیارد تومان، موجودی ۰ تا یک میلیون.
 - [قیمت قبل]: خالی یا عدد حداقل برابر قیمت فعلی. هنگام افزایش قیمت، قیمت قبل کوچک‌تر را هم پاک یا اصلاح کن.
 - [شکل]: `oil`, `filter`, `brake`, `coolant`, `spark`, `wiper`, `spray`. رنگ، `amber`, `cream`, `red`, `blue`.
@@ -41,8 +41,11 @@
 - [تنظیم]: `storeName`, `shippingFee`, `freeShippingThreshold`, `contactEmail`, `contactPhone`. تماس خالی مجاز. `paymentMode` در این نسخه `manual`. حالت نمونه از API خاموش نشود.
 - [خواندن]: کاتالوگ `Cache-Control: no-cache` و `ETag` دهد. `If-None-Match` برابر، پاسخ ۳۰۴ دهد. تغییر کالا، تنظیم یا موجودی کش را باطل کند. داده مشتری `no-store` بماند.
 - [محدودیت]: هر IP تا ۳۰۰ درخواست API در دقیقه. ورود و ثبت مجموع ۱۵ تلاش در ۱۵ دقیقه. سفارش ۲۰ و خبرنامه ۵ تلاش در دقیقه. محدودیت در حافظه یک پردازه است؛ با بازراه‌اندازی پاک شود.
+- [IP]: پیش‌فرض، IP اتصال. فقط با `TRUST_PROXY=true` و اتصال loopback، آخرین IP معتبر `X-Forwarded-For` ملاک شود. پراکسی واحد مورد اعتماد لازم؛ تغییر ابتدای هدر از محدودیت نگذراند.
 - [صفحه]: `limit` عدد ۱ تا ۲۰۰، پیش‌فرض ۲۰۰. `offset` عدد ۰ تا یک میلیون، پیش‌فرض ۰. پاسخ `pagination:{total,limit,offset,hasMore}`. شمار کل مستقل از طول صفحه است.
-- [گزارش]: `reports.byStatus`، ردیف `{status,count,total}` از همه سفارش همان وضعیت. `reports.byDay`، ردیف `{date,count,total}` برای ۳۰ روز UTC؛ count همه سفارش روز، total فقط مبلغ پرداخت‌شده و مراحل پس از آن. مبلغ شامل ارسال است؛ سود خالص نیست.
+- [فیلتر مدیر]: `query` جست‌وجوی سفارش و `status` یکی از وضعیت‌های مجاز. `pagination.total` شمار نتیجه فیلتر. گزارش و شاخص‌ها از کل داده بمانند.
+- [شاخص]: `metrics:{revenue,orders,lowStock,customers,subscribers}` از پایگاه. شمار اعضای خبرنامه واقعی؛ فهرست آخرین ۲۰۰ عضو با آن یکی نیست.
+- [گزارش]: `reports.byStatus`، ردیف `{status,count,total}` از همه سفارش همان وضعیت. `reports.byDay`، ردیف `{date,count,total}` برای ۳۰ روز با روز تهران؛ count همه سفارش روز، total فقط مبلغ پرداخت‌شده و مراحل پس از آن. مبلغ شامل ارسال است؛ سود خالص نیست.
 
 ## نمونه خرید
 

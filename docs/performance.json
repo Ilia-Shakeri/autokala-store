@@ -1,0 +1,23 @@
+{
+  "measuredAt": "2026-10-21T10:10:34.767Z",
+  "endpoint": "http://127.0.0.1:3002/api/catalog",
+  "runtime": "v22.23.0",
+  "method": "GET; 10 warmups; sequential requests; response body consumed and JSON parsed",
+  "requests": 100,
+  "concurrency": 1,
+  "errors": 0,
+  "productCount": 13,
+  "responseBytes": 7428,
+  "durationMs": 1264.812,
+  "requestsPerSecond": 79.06,
+  "latencyMs": {
+    "min": 1.103,
+    "p50": 15.416,
+    "p95": 17.3,
+    "p99": 17.931,
+    "max": 22.255
+  },
+  "p95BudgetMs": 100,
+  "p95BudgetMet": true,
+  "scope": "Single-process read API on this host. No browser vitals, internet latency, concurrent checkout load or public-host guarantee."
+}

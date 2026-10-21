@@ -19,8 +19,10 @@ export async function hashPassword(password) {
   return `scrypt$16384$8$1$${salt}$${(await derive(password,salt)).toString('hex')}`
 }
 export async function verifyPassword(password, storedHash) {
-  const [algorithm,n,r,p,salt,expected] = (storedHash || dummyHash).split('$')
-  if (algorithm !== 'scrypt' || n !== '16384' || r !== '8' || p !== '1' || !/^[a-f0-9]{32}$/.test(salt) || !/^[a-f0-9]{128}$/.test(expected)) return false
+  const encoded = storedHash || dummyHash
+  const parts = encoded.includes(':') ? ['scrypt','16384','8','1',...encoded.split(':')] : encoded.split('$')
+  const [algorithm,n,r,p,salt,expected] = parts
+  if (parts.length !== 6 || algorithm !== 'scrypt' || n !== '16384' || r !== '8' || p !== '1' || !/^[a-f0-9]{32}$/.test(salt) || !/^[a-f0-9]{128}$/.test(expected)) return false
   const candidate = await derive(password,salt)
   const expectedBytes = Buffer.from(expected,'hex')
   return candidate.length === expectedBytes.length && timingSafeEqual(candidate,expectedBytes) && Boolean(storedHash)

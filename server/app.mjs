@@ -4,6 +4,7 @@ import { resolve, sep, extname, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { gzipSync } from 'node:zlib'
 import { timingSafeEqual } from 'node:crypto'
+import { isIP } from 'node:net'
 import { createStore, AppError, sha256 } from './store.mjs'
 import * as valid from './validation.mjs'
 import { createSession, hashPassword, verifyPassword, sessionUser, sessionToken, sessionCookie, publicUser } from './auth.mjs'
@@ -30,6 +31,7 @@ export function createApp({ dbPath, seed = true, reservationTtlMs = 24*60*60*100
   const limits = new Map()
   const files = new Map()
   const originAllowlist = new Set([...allowedOrigins,...(!production ? allowedLocalOrigins : [])])
+  const trustedProxy = (req) => trustProxy && ['127.0.0.1','::1','::ffff:127.0.0.1'].includes(req.socket.remoteAddress)
   let catalogCache
   const invalidate = () => { catalogCache = undefined }
   const sweepReservations = () => { const count = store.expireReservations(); if (count) invalidate(); return count }
@@ -44,8 +46,20 @@ export function createApp({ dbPath, seed = true, reservationTtlMs = 24*60*60*100
     }
     const limit = readPage('limit',200,200)
     const offset = readPage('offset',0,1000000)
-    const where = userId === null ? '' : ' WHERE user_id=?'
-    const args = userId === null ? [] : [userId]
+    const clauses = []
+    const args = []
+    if (userId !== null) { clauses.push('user_id=?'); args.push(userId) }
+    const query = valid.digits(valid.text(url.searchParams.get('query') ?? '','جست‌وجو',0,120)).replace(/ي/g,'ی').replace(/ك/g,'ک').toLowerCase()
+    if (query) {
+      clauses.push("lower(replace(replace(id || ' ' || json_extract(customer,'$.name') || ' ' || json_extract(customer,'$.email') || ' ' || json_extract(customer,'$.phone'),'ي','ی'),'ك','ک')) LIKE ? ESCAPE '\\'")
+      args.push(`%${query.replace(/[\\%_]/g,'\\$&')}%`)
+    }
+    const status = valid.text(url.searchParams.get('status') ?? '','وضعیت',0,30)
+    if (status && status !== 'all') {
+      if (!['pending_payment','paid','processing','shipped','completed','cancelled'].includes(status)) throw new AppError(400,'وضعیت درست نیست.')
+      clauses.push('status=?'); args.push(status)
+    }
+    const where = clauses.length ? ` WHERE ${clauses.join(' AND ')}` : ''
     const total = store.db.prepare(`SELECT COUNT(*) AS count FROM orders${where}`).get(...args).count
     const orders = store.db.prepare(`SELECT * FROM orders${where} ORDER BY created_at DESC,id DESC LIMIT ? OFFSET ?`).all(...args,limit,offset).map(store.order)
     return {orders,pagination:{total,limit,offset,hasMore:offset+orders.length<total}}
@@ -64,11 +78,18 @@ export function createApp({ dbPath, seed = true, reservationTtlMs = 24*60*60*100
     res.end(bytes)
   }
   const admin = (user) => { if (!user) throw new AppError(401,'اول وارد شوید.'); if (user.role !== 'admin') throw new AppError(403,'این بخش برای مدیر است.') }
+  const clientAddress = (req) => {
+    const remote = req.socket.remoteAddress || 'unknown'
+    if (!trustedProxy(req)) return remote
+    // A single trusted loopback proxy appends the real peer address last.
+    const forwarded = String(req.headers['x-forwarded-for'] || '').split(',').at(-1)?.trim()
+    return isIP(forwarded || '') ? forwarded : remote
+  }
   const checkOrigin = (req) => {
     if (req.headers['sec-fetch-site'] === 'cross-site') throw new AppError(403,'مبدأ درخواست مجاز نیست.')
     const origin = req.headers.origin
     if (!origin) return
-    const protocol = secureCookies || (trustProxy && req.headers['x-forwarded-proto'] === 'https') || req.socket.encrypted ? 'https' : 'http'
+    const protocol = secureCookies || (trustedProxy(req) && req.headers['x-forwarded-proto'] === 'https') || req.socket.encrypted ? 'https' : 'http'
     const ownOrigin = `${protocol}://${req.headers.host}`
     if (origin !== ownOrigin && !originAllowlist.has(origin)) throw new AppError(403,'مبدأ درخواست مجاز نیست.')
   }
@@ -90,7 +111,7 @@ export function createApp({ dbPath, seed = true, reservationTtlMs = 24*60*60*100
     res.setHeader('Referrer-Policy','strict-origin-when-cross-origin')
     res.setHeader('Permissions-Policy','camera=(), microphone=(), geolocation=()')
     res.setHeader('Content-Security-Policy',"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'")
-    if (secureCookies || (trustProxy && req.headers['x-forwarded-proto'] === 'https') || req.socket.encrypted) res.setHeader('Strict-Transport-Security','max-age=31536000')
+    if (secureCookies || (trustedProxy(req) && req.headers['x-forwarded-proto'] === 'https') || req.socket.encrypted) res.setHeader('Strict-Transport-Security','max-age=31536000')
     try {
       const url = new URL(req.url,'http://localhost')
       const path = url.pathname
@@ -98,11 +119,11 @@ export function createApp({ dbPath, seed = true, reservationTtlMs = 24*60*60*100
       if (path === '/health/live' && method === 'GET') return send(res,200,{ live:true })
       if (path === '/health/ready' && method === 'GET') { store.db.prepare('SELECT 1').get(); return send(res,200,{ ready:true,staticBuilt:existsSync(resolve(distPath,'index.html')) }) }
       if (!path.startsWith('/api/')) return serveStatic(req,res,path)
-      const ip = req.socket.remoteAddress || 'unknown'
+      const ip = clientAddress(req)
       rateLimit(`all:${ip}`,300,60000)
       if (!['GET','HEAD'].includes(method)) checkOrigin(req)
       const user = sessionUser(store,req)
-      const cookieSecure = secureCookies || Boolean(req.socket.encrypted) || (trustProxy && req.headers['x-forwarded-proto'] === 'https')
+      const cookieSecure = secureCookies || Boolean(req.socket.encrypted) || (trustedProxy(req) && req.headers['x-forwarded-proto'] === 'https')
       if (path === '/api/catalog' && method === 'GET') {
         if (!catalogCache) { const value = store.catalog(); catalogCache = {value,etag:`"${sha256(JSON.stringify(value))}"`} }
         if (req.headers['if-none-match'] === catalogCache.etag) { res.writeHead(304,{'ETag':catalogCache.etag,'Cache-Control':'no-cache'}); return res.end() }
@@ -171,9 +192,9 @@ export function createApp({ dbPath, seed = true, reservationTtlMs = 24*60*60*100
         admin(user)
         if (path === '/api/admin/overview' && method === 'GET') {
           sweepReservations()
-          const metrics = {revenue:store.db.prepare("SELECT COALESCE(SUM(total),0) AS n FROM orders WHERE status IN ('paid','processing','shipped','completed')").get().n,orders:store.db.prepare('SELECT COUNT(*) AS n FROM orders').get().n,lowStock:store.db.prepare('SELECT COUNT(*) AS n FROM products WHERE stock<=5').get().n,customers:store.db.prepare("SELECT COUNT(*) AS n FROM users WHERE role='customer'").get().n}
-          const cutoff = new Date(); cutoff.setUTCHours(0,0,0,0); cutoff.setUTCDate(cutoff.getUTCDate()-29)
-          const reports = {byStatus:store.db.prepare('SELECT status,COUNT(*) AS count,SUM(total) AS total FROM orders GROUP BY status ORDER BY status').all(),byDay:store.db.prepare("SELECT substr(created_at,1,10) AS date,COUNT(*) AS count,SUM(CASE WHEN status IN ('paid','processing','shipped','completed') THEN total ELSE 0 END) AS total FROM orders WHERE created_at>=? GROUP BY substr(created_at,1,10) ORDER BY date").all(cutoff.toISOString())}
+          const metrics = {revenue:store.db.prepare("SELECT COALESCE(SUM(total),0) AS n FROM orders WHERE status IN ('paid','processing','shipped','completed')").get().n,orders:store.db.prepare('SELECT COUNT(*) AS n FROM orders').get().n,lowStock:store.db.prepare('SELECT COUNT(*) AS n FROM products WHERE stock<=5').get().n,customers:store.db.prepare("SELECT COUNT(*) AS n FROM users WHERE role='customer'").get().n,subscribers:store.db.prepare('SELECT COUNT(*) AS n FROM subscribers').get().n}
+          const cutoff = new Date(Date.now()+3.5*60*60*1000); cutoff.setUTCDate(cutoff.getUTCDate()-29)
+          const reports = {byStatus:store.db.prepare('SELECT status,COUNT(*) AS count,SUM(total) AS total FROM orders GROUP BY status ORDER BY status').all(),byDay:store.db.prepare("SELECT date(created_at,'+03:30') AS date,COUNT(*) AS count,SUM(CASE WHEN status IN ('paid','processing','shipped','completed') THEN total ELSE 0 END) AS total FROM orders WHERE date(created_at,'+03:30')>=? GROUP BY date(created_at,'+03:30') ORDER BY date").all(cutoff.toISOString().slice(0,10))}
           const catalog = store.catalog()
           return send(res,200,{metrics,...pageOrders(url),reports,products:catalog.products,categories:catalog.categories,subscribers:store.db.prepare('SELECT id,phone,consent_at AS consentAt FROM subscribers ORDER BY id DESC LIMIT 200').all()})
         }

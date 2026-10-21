@@ -17,10 +17,11 @@
 | `NODE_ENV` | خالی | برای استقرار `production` |
 | `ALLOWED_ORIGINS` | خالی | مبدأهای مجاز، با ویرگول |
 | `SECURE_COOKIES` | `false` | پشت HTTPS، `true` |
-| `TRUST_PROXY` | `false` | فقط پشت پراکسی مورد اعتماد `true` |
+| `TRUST_PROXY` | `false` | فقط پشت یک پراکسی مورد اعتماد روی loopback، `true` |
 | `ADMIN_PASSWORD_FILE` | خالی | فقط فرمان مدیر؛ فایل خصوصی رمز |
 
 - [شبکه]: در توسعه مبدأهای محلی درگاه ۸۴۴۳ و ۵۱۷۳ مجاز. در استقرار فقط مبدأ خود سرور و فهرست بالا.
+- [پراکسی]: با `TRUST_PROXY=true` فقط اتصال loopback برای IP کاربر پذیرفته می‌شود. پراکسی، IP واقعی را آخر `X-Forwarded-For` بگذارد؛ `X-Forwarded-Proto` را بازنویسی کند. `HOST=127.0.0.1` بماند. چند پراکسی زنجیره‌ای، تنظیم و بررسی جدا می‌خواهد.
 - [کوکی]: `HttpOnly`, `SameSite=Lax`، عمر ۱۴ روز. زیر HTTPS، `Secure`. شناسه نشست در داده هش می‌شود.
 - [رمز]: scrypt با نمک جدا. تلاش ورود و ثبت و درخواست انبوه محدود.
 - [طول رمز]: ۱۲ تا ۱۲۸ نویسه. فاصله داخل رمز حفظ می‌شود.
@@ -55,8 +56,8 @@
 | GET | `/api/orders?limit=200&offset=0` | حساب لازم؛ `{orders,pagination:{total,limit,offset,hasMore}}`؛ سقف هر صفحه ۲۰۰ |
 | GET | `/api/orders/:id` | `{order}`؛ مهمان هدر `X-Receipt-Token` بدهد |
 | POST | `/api/subscribe` | `{phone,consent:true}` → `{ok:true,message}` |
-| GET | `/api/admin/overview?limit=200&offset=0` | مدیر؛ `{metrics:{revenue,orders,lowStock,customers},orders,pagination,reports,products,categories,subscribers}` |
-| GET | `/api/admin/orders?limit=200&offset=0` | مدیر؛ `{orders,pagination}`؛ همه صفحه‌ها در دسترس |
+| GET | `/api/admin/overview?limit=200&offset=0` | مدیر؛ `{metrics:{revenue,orders,lowStock,customers,subscribers},orders,pagination,reports,products,categories,subscribers}` |
+| GET | `/api/admin/orders?limit=200&offset=0&query=&status=all` | مدیر؛ `{orders,pagination}`؛ همه صفحه‌ها در دسترس |
 | POST | `/api/admin/products` | مدیر؛ کالای کامل → `{product}` |
 | PATCH | `/api/admin/products/:id` | مدیر؛ فیلدهای تغییر → `{product}` |
 | PATCH | `/api/admin/orders/:id` | مدیر؛ `{status}` → `{order}` |
@@ -68,7 +69,8 @@
 - [دسته]: `{id,title,icon,count}`. شمار از کالای موجود در داده؛ ساختگی نیست.
 - [خودرو]: `{brand,model,years:number[]}`. سازگاری نمونه، تأیید فنی خرید لازم.
 - [سفارش]: `{id,customer,items:[{productId,name,price,quantity,lineTotal}],subtotal,shipping,total,status,note,createdAt,updatedAt,expiresAt}`.
-- [گزارش]: `reports.byStatus` فهرست `{status,count,total}` از همه داده. `reports.byDay` فهرست `{date,count,total}` برای ۳۰ روز UTC. تعداد روز همه سفارش‌ها؛ جمع روز فقط وضعیت پرداخت‌شده و پس از آن.
+- [گزارش]: `reports.byStatus` فهرست `{status,count,total}` از همه داده. `reports.byDay` فهرست `{date,count,total}` برای ۳۰ روز به وقت تهران. تعداد روز همه سفارش‌ها؛ جمع روز فقط وضعیت پرداخت‌شده و پس از آن. شمار عضو خبر از `metrics.subscribers`، نه اندازه صفحه.
 - [صفحه]: `limit` از ۱ تا ۲۰۰؛ پیش‌فرض ۲۰۰. `offset` از ۰ تا ۱۰۰۰۰۰۰. گزارش و آمار، از همه داده؛ محدود به صفحه نیست.
+- [جست‌وجو]: `query` تا ۱۲۰ نویسه؛ شناسه، نام، ایمیل و همراه. رقم فارسی و عربی عادی می‌شود. `status` اختیاری؛ یکی از وضعیت‌های سفارش یا `all`. `pagination.total` شمار نتیجه فیلتر. روی سفارش‌های خود کاربر و مدیر کار می‌کند.
 - [تنظیمات]: `{storeName,shippingFee,freeShippingThreshold,paymentMode:'manual',demo:true,contactEmail?,contactPhone?}`.
 - [تست]: `createApp({dbPath,seed,reservationTtlMs,distPath,allowedOrigins,production,trustProxy,secureCookies,logger})` از `server/app.mjs`. خروجی `{server,store,handler,close}`. اول `server.listen(0,'127.0.0.1')`؛ پایان `await close()`. `store.expireReservations(now)` برای آزمون مهلت، شمار آزادشده می‌دهد.
