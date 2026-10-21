@@ -1,0 +1,10 @@
+{
+  "description": "An Iranian e-commerce platform offering automotive consumables with a user-friendly RTL interface, animated design, and a robust admin panel for managing products and orders.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}
