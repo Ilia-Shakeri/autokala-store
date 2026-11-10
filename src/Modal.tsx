@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from 'react'
+import { useEffect, useRef, type ReactNode, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
 import { Icon } from './ui'
 
@@ -7,7 +7,7 @@ let originalInert = false
 let originalOverflow = ''
 const modalStack: HTMLElement[] = []
 
-export function Modal({ title, onClose, children, drawer = false, className = '', footer, closeDisabled = false }: {title: string; onClose: () => void; children: ReactNode; drawer?: boolean; className?: string; footer?: ReactNode; closeDisabled?: boolean}) {
+export function Modal({ title, onClose, children, drawer = false, className = '', footer, closeDisabled = false, surfaceRef }: {title: string; onClose: () => void; children: ReactNode; drawer?: boolean; className?: string; footer?: ReactNode; closeDisabled?: boolean; surfaceRef?: RefObject<HTMLDivElement|null>}) {
   const panel = useRef<HTMLDivElement>(null)
   const close = useRef(onClose)
   const backdropPress = useRef(false)
@@ -46,13 +46,13 @@ export function Modal({ title, onClose, children, drawer = false, className = ''
       if (top) top.inert = false
       if (--activeModals === 0) {document.body.style.overflow=originalOverflow;if(root)root.inert=originalInert}
       if (wasTop) {
-        if (previous?.isConnected && !previous.closest('[inert]')) previous.focus()
+        if (previous?.isConnected && !previous.closest('[inert]')) previous.focus({preventScroll:true})
         else top?.focus()
       }
     }
   }, [])
   return createPortal(<div className={drawer ? 'drawer-backdrop' : 'modal-backdrop'} onPointerDown={event => {backdropPress.current = event.target === event.currentTarget}} onClick={event => {if(event.target === event.currentTarget && backdropPress.current) close.current();backdropPress.current=false}}>
-    <div className={`${drawer ? 'cart-drawer' : 'product-modal'} ${className}`} ref={panel} role="dialog" aria-modal="true" aria-label={title} tabIndex={-1} onClick={e => e.stopPropagation()} dir="rtl">
+    <div className={`${drawer ? 'cart-drawer' : 'product-modal'} ${className}`} ref={node=>{panel.current=node;if(surfaceRef)surfaceRef.current=node}} role="dialog" aria-modal="true" aria-label={title} tabIndex={-1} onClick={e => e.stopPropagation()} dir="rtl">
       <div className="drawer-head"><h2>{title}</h2><button type="button" aria-label="بستن" disabled={closeDisabled} onClick={onClose}><Icon name="x" /></button></div>
       {children}
       {footer && <div className="modal-footer">{footer}</div>}
