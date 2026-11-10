@@ -1,7 +1,7 @@
 import { useEffect, useId, useMemo, useRef, useState, type Dispatch, type SetStateAction, type FormEvent } from 'react'
 import { api, json, normalize } from './api'
 import { Modal } from './Modal'
-import { ProductImage, PhotoCredit } from './ProductImage'
+import { ProductImage } from './ProductImage'
 import { Select } from './Select'
 import { ActionButton, CartButton, useActionFeedback } from './ActionButton'
 import { CheckoutDialog, hasPendingOrder } from './CommerceDialogs'
@@ -10,6 +10,7 @@ import type { CartItem, Catalog, Product, User } from './types'
 import { phoneIssue } from './customer-validation'
 import CartDrawer from './CartDrawer'
 import { CartNumber } from './cart-motion'
+import ProductDetail from './ProductDetail'
 
 type Props = {catalog: Catalog; cart: CartItem[]; setCart: Dispatch<SetStateAction<CartItem[]>>; user: User | null; onAccount:()=>void; onRefresh:()=>void; notify:(message:string)=>void}
 const information: Record<string, string[]> = {
@@ -71,11 +72,12 @@ export default function Storefront({catalog,cart,setCart,user,onAccount,onRefres
     return result
   },[products,category,special,favoritesOnly,favorites,vehicle,query,sort])
   const toggleFavorite = (id:number) => {const next=favorites.includes(id)?favorites.filter(n=>n!==id):[...favorites,id];setFavorites(next);try{localStorage.setItem('autokala.favorites.v1',JSON.stringify(next))}catch{/* Favorites still work for the current visit. */}}
-  const add = (product:Product) => {
+  const add = (product:Product, amount=1, announce=true) => {
+    if(!Number.isInteger(amount)||amount<1||amount>99)return false
     const count=cart.find(item=>item.productId===product.id)?.quantity||0
     if(!count&&cart.length>=50){notify('سبد حداکثر ۵۰ کالای متفاوت می‌پذیرد. ابتدا یک کالا را حذف کنید.');return false}
-    if(count>=product.stock||count>=99){notify('بیش از موجودی کالا نمی‌توان به سبد افزود.');return false}
-    setCart(current=>{const existing=current.find(item=>item.productId===product.id);if(existing&&(existing.quantity>=product.stock||existing.quantity>=99)||!existing&&current.length>=50)return current;return existing?current.map(item=>item.productId===product.id?{...item,quantity:item.quantity+1}:item):[...current,{productId:product.id,quantity:1}]});notify('کالا به سبد اضافه شد.');return true
+    if(count+amount>product.stock||count+amount>99){notify('بیش از موجودی کالا نمی‌توان به سبد افزود.');return false}
+    setCart(current=>{const existing=current.find(item=>item.productId===product.id);if(existing&&(existing.quantity+amount>product.stock||existing.quantity+amount>99)||!existing&&current.length>=50)return current;return existing?current.map(item=>item.productId===product.id?{...item,quantity:item.quantity+amount}:item):[...current,{productId:product.id,quantity:amount}]});if(announce)notify('کالا به سبد اضافه شد.');return true
   }
   const quantity=cart.reduce((n,item)=>n+item.quantity,0)
   const pendingOrder=hasPendingOrder()
@@ -102,16 +104,7 @@ export default function Storefront({catalog,cart,setCart,user,onAccount,onRefres
     <footer><div className="footer-main section"><div className="footer-brand"><Logo light/><p>انتخاب لوازم مصرفی خودرو؛<br/>از مشخصات کالا تا پیگیری سفارش.</p></div><div><strong>اتوکالا</strong>{['درباره ما','تماس با ما','فرصت‌های شغلی'].map(title=><button key={title} onClick={()=>setInfo(title)}>{title}</button>)}</div><div><strong>راهنمای خرید</strong>{['روش‌های پرداخت','ارسال سفارش','شرایط بازگشت'].map(title=><button key={title} onClick={()=>setInfo(title)}>{title}</button>)}</div><div className="newsletter"><strong>خبرهای فروشگاه</strong><p>شماره برای اطلاع‌رسانی آینده ثبت می‌شود؛ پیامک فعلاً فعال نیست.</p><form onSubmit={subscribe}><label className="newsletter-phone"><input value={phone} disabled={subscribing} required onChange={e=>{subscription.clear();setPhone(e.target.value);if(subscriptionError)setSubscriptionError(phoneIssue(e.target.value))}} onBlur={()=>{if(phone)setSubscriptionError(phoneIssue(phone))}} aria-invalid={Boolean(subscriptionError)||undefined} aria-describedby={subscriptionError?'newsletter-error':undefined} placeholder="شماره موبایل با ۰۹" inputMode="tel" autoComplete="tel" aria-label="موبایل خبرنامه" maxLength={30}/><ActionButton pending={subscribing} done={subscription.done} doneLabel="ثبت شد" pendingLabel="ثبت…" disabled={!consent} aria-label="ثبت شماره خبرنامه"><Icon name="arrow"/></ActionButton></label><label className="consent"><input type="checkbox" disabled={subscribing} checked={consent} onChange={e=>setConsent(e.target.checked)} required/>با ثبت شماره برای خبرهای فروشگاه موافقم.</label>{subscriptionError&&<p className="form-error" id="newsletter-error" role="alert">{subscriptionError}</p>}</form></div></div><div className="footer-bottom section"><span>© {new Date().toLocaleDateString('fa-IR',{year:'numeric'})} اتوکالا · نسخه آزمایشی</span><span>قطعه درست، انتخاب روشن</span></div></footer>
     <CartDrawer open={cartOpen} items={cart} products={products} settings={settings} setCart={setCart} pendingOrder={pendingOrder} onClose={()=>setCartOpen(false)} onBrowse={()=>{setCartOpen(false);scrollProducts()}} onCheckout={()=>{setCheckoutItems(cart.map(item=>({...item})));setCartOpen(false)}} onRecover={()=>{setCheckoutItems(cart.map(item=>({...item})));setCartOpen(false)}} onInspect={setDetail}/>
     {checkoutItems&&<CheckoutDialog products={products} items={checkoutItems} user={user} onClose={()=>setCheckoutItems(null)} onComplete={submitted=>{setCart(current=>current.map(item=>({...item,quantity:item.quantity-(submitted.find(ordered=>ordered.productId===item.productId)?.quantity||0)})).filter(item=>item.quantity>0));onRefresh()}}/>}
-    {detail&&<Modal className="product-detail-dialog" title={detail.name} onClose={()=>setDetail(null)} footer={<div className="detail-purchase"><div className="detail-price"><span>قیمت کالا</span><strong>{formatPrice(detail.price)} <small>تومان</small></strong></div><CartButton key={detail.id} disabled={!detail.stock} onAdd={()=>add(detail)}><Icon name="cart" size={19}/>{detail.stock?'افزودن به سبد':'ناموجود'}</CartButton></div>}>
-      <div className="product-detail-layout" tabIndex={0} role="region" aria-label="تصویر و مشخصات کالا">
-        <div className="product-detail-media"><div className={`detail-visual bg-${detail.color}`}><ProductImage product={detail}/></div><PhotoCredit product={detail}/></div>
-        <div className="product-details">
-          <p className="detail-description">{detail.description}</p>
-          <dl><dt>برند و کد</dt><dd>{detail.brand}<br/><bdi dir="ltr">{detail.sku}</bdi></dd><dt>دسته</dt><dd>{detail.category}</dd><dt>موجودی نمونه</dt><dd>{formatPrice(detail.stock)} عدد</dd><dt>خودروهای نمونه</dt><dd>{detail.vehicles.join('، ')||'نیازمند بررسی کد فنی'}</dd></dl>
-          <p className="muted-note">سازگاری با کد فنی و دفترچه خودرو تأیید شود.</p>
-        </div>
-      </div>
-    </Modal>}
+    {detail&&<ProductDetail key={detail.id} product={detail} inCart={cart.find(item=>item.productId===detail.id)?.quantity||0} cartFull={cart.length>=50&&!cart.some(item=>item.productId===detail.id)} saved={favorites.includes(detail.id)} onFavorite={()=>toggleFavorite(detail.id)} onAdd={amount=>add(detail,amount,false)} onClose={()=>setDetail(null)} onCart={()=>setCartOpen(true)}/>}
     {info&&<Modal title={info} onClose={()=>setInfo('')}><div className="info-copy">{contact?<><p>شماره تماس: <b dir="ltr">{settings.contactPhone||'هنوز ثبت نشده'}</b></p><p>ایمیل: <b dir="ltr">{settings.contactEmail||'هنوز ثبت نشده'}</b></p></>:information[info]?.map(text=><p key={text}>{text}</p>)}</div></Modal>}
   </div>
 }

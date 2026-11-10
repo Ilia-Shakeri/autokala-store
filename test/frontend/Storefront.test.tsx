@@ -1,5 +1,5 @@
 import { it,expect,vi } from 'vitest'
-import { render,screen,fireEvent,waitFor } from '@testing-library/react'
+import { render,screen,fireEvent,waitFor,within } from '@testing-library/react'
 import Storefront from '../../src/Storefront'
 import { categories,products,vehicles } from '../../server/seed.mjs'
 import type { CartItem,Catalog } from '../../src/types'
@@ -98,4 +98,18 @@ it.each([{cart:[]},{cart:[{productId:999999,quantity:1}]}] as {cart:CartItem[]}[
   expect(request).toHaveBeenCalledTimes(1)
   expect(request.mock.calls[0][0]).toBe('/orders')
   expect(JSON.parse(request.mock.calls[0][1]!.body as string)).toEqual(body)
+})
+
+it('adds the requested detail quantity atomically and rejects a late stock overflow',()=>{
+  const item={...catalog.products[0],stock:4}
+  const setCart=vi.fn()
+  render(<Storefront catalog={{...catalog,products:[item]}} cart={[{productId:item.id,quantity:1}]} setCart={setCart} user={null} onAccount={()=>{}} onRefresh={()=>{}} notify={()=>{}}/>)
+  fireEvent.click(screen.getByRole('button',{name:`مشخصات ${item.name}`,exact:true}))
+  const detail=within(screen.getByRole('dialog',{name:'جزئیات کالا'}))
+  fireEvent.click(detail.getByRole('button',{name:'زیاد کردن تعداد'}))
+  fireEvent.click(detail.getByRole('button',{name:'افزودن به سبد',exact:true}))
+  const update=setCart.mock.calls[0][0]
+  expect(update([{productId:item.id,quantity:1}])).toEqual([{productId:item.id,quantity:3}])
+  const changed=[{productId:item.id,quantity:3}]
+  expect(update(changed)).toBe(changed)
 })
