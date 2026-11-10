@@ -22,7 +22,7 @@
 
 @layer base {
   html { scroll-behavior: smooth; scroll-padding-top: 110px; }
-  body { min-width: 320px; background: var(--paper); }
+  body { min-width: 0; background: var(--paper); }
   button { cursor: pointer; }
   button:disabled { cursor: not-allowed; opacity: .5; }
   button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, a:focus-visible { outline: 3px solid #7b9520; outline-offset: 3px; }

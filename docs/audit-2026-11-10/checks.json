@@ -1,0 +1,17 @@
+{
+  "date": "2026-11-10",
+  "baseCommit": "65c8860",
+  "scope": "local source and isolated synthetic data",
+  "node": "22.23.0",
+  "backend": {"passed": 46, "failed": 0, "durationMs": 8099},
+  "frontend": {"passed": 68, "failed": 0, "files": 11, "durationSeconds": 28.46},
+  "build": {"passed": true, "typecheckIncluded": true, "modules": 103},
+  "dependencyAudit": {"runtimeAndDev": true, "knownVulnerabilities": 0},
+  "browserWidths": [320, 390, 768, 844, 1440],
+  "shortLandscape": {"width": 844, "height": 390},
+  "finalOverflowChecks": {"store320": {"client": 305, "scroll": 305}, "admin320": {"client": 305, "scroll": 305}, "store768": {"client": 753, "scroll": 753}, "store1440": {"client": 1425, "scroll": 1425}},
+  "browserConsoleErrors": {"finalStore": 0, "finalAdmin": 0},
+  "syntheticOrder": {"totalToman": 850000, "status": "pending_payment", "downloadVerified": true, "accountHistoryVerified": true, "guestLookupVerified": true},
+  "hostedWorkflow": ".github/workflows/checks.yml",
+  "notVerified": ["physical iPhone/Safari", "physical Android", "real screen reader", "live payment", "live shipping", "public hosting"]
+}

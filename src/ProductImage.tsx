@@ -9,9 +9,9 @@ const fallbackSku:Record<string,string>={oil:'OIL-BHR-1040-4',filter:'FLT-SRK-20
 export function productPhoto(product:Pick<Product,'sku'|'visual'>):Photo|undefined{return mapping[product.sku]||mapping[fallbackSku[product.visual]]}
 export function ProductImage({product}:{product:Pick<Product,'sku'|'visual'|'name'>}){
   const image=productPhoto(product)
-  const [failed,setFailed]=useState(false)
-  if(!image||failed)return <ProductVisual type={product.visual}/>
-  return <img className="product-photo" src={image.src} alt={image.alt} width={image.width} height={image.height} loading="lazy" decoding="async" onError={()=>setFailed(true)}/>
+  const [failedSource,setFailedSource]=useState('')
+  if(!image||failedSource===image.src)return <ProductVisual type={product.visual}/>
+  return <img className="product-photo" src={image.src} alt={image.alt} width={image.width} height={image.height} loading="lazy" decoding="async" onError={()=>setFailedSource(image.src)}/>
 }
 export function PhotoCredit({product}:{product:Pick<Product,'sku'|'visual'>}){
   const photo=productPhoto(product)

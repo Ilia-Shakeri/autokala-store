@@ -1,0 +1,68 @@
+- [scope]: Fresh local review, 2026-11-10. Base `65c8860`. Shop, 12 goods, all menus, help, account, cart, checkout, receipt, all six admin views checked. No live sales data touched.
+- [method]: In-app browser, fresh DOM checks, saved screens, code review, regression tests. Apple design guide used: fast press feedback, clear layers, big taps, calm motion, safe focus. Green/yellow style kept.
+- [score loop 1]: 8/10. Stock race, stale forms, phone taps, menu focus, quote and retry gaps found. Fixes applied.
+- [score loop 2]: 8/10. Proxy host loss, body focus loss, caller timeout loss, unclear order retry, empty-cart recovery found. Fixes applied.
+- [score loop 3]: 9/10 for checked local scope. Build, type check, server and UI tests pass. Real hardware and live trade need own proof. Score is review judgment, not a promise of no bugs.
+
+- [P1 server/app.mjs]: Slow product PATCH read stock too soon. Sale took stock to 17; late edit put 18 back. Read row after full body now. Split-body regression proves fix.
+- [P1 AdminPanel.tsx]: Full old edit payload could undo a sale. Send only changed fields now. No-op save skips write.
+- [P1 server/app.mjs]: Old stock edit could erase a newer stock count. `expectedStock` now rejects stale edit with 409. Admin sends original count for stock edits. Old callers without guard stay compatible.
+- [P1 CommerceDialogs.tsx]: Lost order reply plus changed form could trap retry or lead to duplicate new order. Freeze exact body and key now. Same request recovers same receipt.
+- [P1 CommerceDialogs.tsx]: Closing or reloading lost unclear order state. Pending draft now stays in this tab's session store until resolved. Corrupt draft rejected. Blocked storage gets leave warning.
+- [P1 Storefront.tsx]: Old checkout success could wipe new cart goods. Remove only submitted count now. Empty or invalid cart still has old-order recovery button.
+- [P2 vite.config.ts]: String proxy changed admin host to shop host. Preview admin showed shop. Explicit `changeOrigin:false` now keeps host in dev and preview. Live context checks show true for localhost, false for 127.0.0.1.
+- [P2 server/app.mjs]: Missing production shell still gave ready 200. Now 503 and `ready:false`. Dev API-only readiness still works. Missing file and directory tests pass.
+- [P2 api.ts]: Caller abort signal dropped 15s deadline. Combined signals now keep timeout and caller cancel. Both paths tested.
+- [P2 CommerceDialogs.tsx]: Cart change left old quote live. Clear quote, abort old read, reject stale result now. Submit waits for fresh sum.
+- [P2 CommerceDialogs.tsx]: Order history load fail looked like empty history. Clear load/error state and retry now. Old rows no longer look current.
+- [P2 CommerceDialogs.tsx]: Edited order ID/key left old receipt showing. Edit clears result; late replies ignored now.
+- [P2 App.tsx]: Older catalog refresh could overwrite newer data. Latest request now wins. Out-of-order regression passes.
+- [P2 AdminPanel.tsx]: Failed new search left old matching rows on screen. Clear rows, show load/error, retry now. Query capped at server's 120 chars.
+- [P2 AdminPanel.tsx]: Loose category text search included wrong goods. Exact category filter now.
+- [P2 AdminPanel.tsx]: One cancel tap freed stock. Last check now names loss; keep-order choice works. Paid orders still need separate refund flow.
+- [P2 AdminPanel.tsx]: Phone menu let focus leave to page. Background inert, focus cycle and Escape now keep control in menu. Desk resize closes and unlocks scroll.
+- [P2 admin.css]: Wide orders table made phone work hard. Narrow screens now show labeled order cards. Long text wraps; paging and key taps fit.
+- [P2 Modal.tsx]: Stacked dialogs left lower layer live. Lower layer inert now; only top handles keys. Focus and scroll restore after close.
+- [P2 Modal.tsx]: Drag from panel to scrim could close form. Scrim dismiss now needs press to start on scrim.
+- [P2 Modal.tsx]: Pending save left close looking live. Busy close now disabled. Body Tab after disabled control now returns to panel. Portaled select keys still work.
+- [P2 index.css]: Body min width caused side scroll at 320px with a scrollbar. Min width now zero. Checked `scrollWidth === clientWidth`, not just viewport width.
+- [P2 glass.css]: Cart minus/plus were 27px; remove was 17px. All now 44px. Filters, close, menu and related taps enlarged too.
+- [P2 glass.css]: Toast hid checkout action. Toast now ignores pointer and sits above dialog action row. Status lives outside inert page root.
+- [P2 glass.css, admin.css]: Small phone input text caused zoom risk. Editable phone/tablet fields now 16px. Safe-area and long-text spacing kept.
+- [P3 server/app.mjs]: Auth throttle said 60s for a 15min block. Retry header now gives real remaining wait. Short-window limit still says 60s.
+- [P3 api.ts]: Persian/Arabic and Latin digits did not match in search. Digit normalization now lets `FLT-SRK-۲۰۶-A` find Latin SKU.
+- [P3 Storefront.tsx]: Bad, duplicate and gone favorites inflated count. Saved list now bounded and sanitized against current catalog.
+- [P3 Storefront.tsx]: Cart could exceed server's 50-line cap. New line now stops at same cap. Existing line can still grow within stock/99 limit.
+- [P3 CommerceDialogs.tsx]: Phone/post code failed late at server. Inline checks now accept Persian/Arabic digits and point to bad field. Account length limits match server. Guest key required.
+- [P3 Storefront.tsx]: Newsletter had late validation and fields could change during save. Inline phone check, locked pending fields, clear consent/result now.
+- [P3 Storefront.tsx]: Open product detail held old catalog object. Detail now uses fresh product by ID and closes if gone.
+- [P3 Storefront.tsx]: Phone menu lacked clear expanded target, Escape/outside close and desk reset. All wired now. Filters expose pressed state.
+- [P3 motion.css, ui.tsx]: Reduced-motion loading still pulsed; logo scroll still forced smooth. Static load feedback and calm scroll now honor preference.
+- [P3 Select.tsx]: Programmatic valid value could keep old invalid mark. Invalid mark now needs empty active value.
+- [P3 ProductImage.tsx]: One failed image blocked later source in same component. Failure now scoped to source URL.
+- [P3 CommerceDialogs.tsx]: Saved receipt list trusted malformed local values. Shape, bounds and duplicate IDs checked now.
+- [P3 .github/workflows/checks.yml]: No hosted check workflow existed. Pinned actions now run locked install, build and tests on Windows and Linux. Action source: [checkout](https://github.com/actions/checkout), [setup-node](https://github.com/actions/setup-node).
+
+- [step 01/home]: Pass in 320, 390, 768, 1440px widths. Desktop style kept; no page side scroll in measured final views. [Before desk](01-desktop-before.png), [before phone](02-phone-before.png), [after 320](17-store-320-after.png), [after desk](23-home-desktop-after.png).
+- [step 02/nav]: Pass. Shop, categories, special, magazine, logo and skip path wired. Phone open/close, Escape/outside behavior reviewed. [Tablet](21-tablet-after.png).
+- [step 03/catalog]: Pass. All six categories show two sample goods. Four sort modes, favorite add/list, empty search/reset, mixed-digit SKU and model/year path checked. Vehicle result gives five sample matches; year says guide only.
+- [step 04/product]: Pass. All 12 detail views have named dialog, image, price, purchase control and no inner side overflow on desktop. Phone sample loads real local image and scrolls details. [Phone detail](18-product-320-after.png).
+- [step 05/cart]: Pass. Add, count, minus/plus, remove, empty state, stock/cap gates reviewed and tested. Actual narrow control sizes measured 44px; footer action 50px. [Before taps](04-cart-phone-before.png), [after taps](19-cart-320-after.png).
+- [step 06/checkout]: Pass locally. Required fields, Persian digits, fresh quote, error retry, uncertain-response recovery, short viewport action row checked. One synthetic order total 850000 toman, status `pending_payment`; no money moved. [Phone form before](05-checkout-phone-before.png), [landscape after](20-checkout-landscape-after.png).
+- [step 07/receipt]: Pass locally. Downloaded JSON matches synthetic order ID and total; key present. Account history and guest key lookup return same order. No real customer receipt saved in this report. [Account history](14-phone-account-orders.png).
+- [step 08/account]: Pass locally. Signup, signout, login form, track form, saved receipt choice and history tested. Load failure/retry, result invalidation and length checks have regressions. [Login view](06-account-phone.png).
+- [step 09/help]: Pass. All six footer buttons open real text with close/focus. About, contact, jobs, pay, ship, returns checked. Magazine gives sample fit guidance. [About](15-info-1.png), [contact](15-info-2.png), [jobs](15-info-3.png), [pay](15-info-4.png), [ship](15-info-5.png), [returns](15-info-6.png).
+- [step 10/newsletter]: Pass locally. Bad phone gives inline error. Valid Persian phone plus explicit consent saves; fields and consent reset. Sending SMS stays clearly off. [Result](16-newsletter-phone.png).
+- [step 11/admin login]: Pass locally. Admin host login works after proxy fix. Public host does not mount admin. Session/role/host and write-origin gates covered by backend tests.
+- [step 12/admin dashboard]: Pass in phone and desk views. Counts from seeded sample data. Refresh, view-all, add and navigation checked. [Phone dashboard](07-admin-phone-dashboard.png), [menu](08-admin-phone-menu.png).
+- [step 13/admin orders]: Pass locally. Search/status, pagination, detail, unpaid reserve deadline, manual-payment check and cancel/keep path checked. [Desk orders](12-admin-desktop-orders.png), [detail](13-admin-desktop-order-detail.png).
+- [step 14/admin goods]: Pass locally. Add/edit form, exact category, sparse save, stock guard, no-op and failure retry have tests. Phone form fields fit; input size checked. [Phone form](09-admin-phone-product-form.png).
+- [step 15/admin categories]: Pass locally. List, counts, view-goods, new-category form, duplicate/write failure and preserved draft retry checked.
+- [step 16/admin reports]: Pass visually. Summary/status/day report read from full seeded history. Phone day table can scroll inside its own area. [Phone reports](10-admin-phone-reports.png).
+- [step 17/admin setup]: Pass as honest status page. Pay, ship and contact say waiting for owner input. Before-width-fix narrow capture kept as defect proof. [Narrow defect](11-admin-setup-320.png), [final admin 320px](24-admin-320-after.png).
+- [step 18/shared behavior]: Regression checks cover top-only focus, stack cleanup, disabled-control focus loss, backdrop drag, select menu Escape, latest refresh, abort and timeout. Screens alone do not prove full accessibility.
+
+- [checks]: Local server tests 46 pass. Local frontend tests 68 pass. Build includes TypeScript check. Dependency audit finds zero known flaws across runtime and dev packages on review date. Full logs summarized in `checks.json`.
+- [privacy]: Only synthetic accounts/orders used. Test database lives in memory. Pending order delivery/contact fields and exact request key stay only in this tab's session store while outcome is unclear; no password stored. Success or definite initial no-create response clears draft. Storage denial keeps in-memory recovery plus leave warning.
+- [limits]: Real iPhone/Safari and Android hardware not checked. Browser widths are layout evidence. Real screen reader, large system text, OS keyboard and slow hardware still need owner/device pass. No claim every future browser or bug is covered.
+- [limits]: Payment gateway, real shipping, owner contact, real prices/stock/fit and return policy still need owner input and live proof. Placeholders stay honest. This commit does not publish a live shop.

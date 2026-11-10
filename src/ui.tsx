@@ -104,7 +104,7 @@ export function ProductVisual({ type }: { type: string }) {
 
 export function Logo({ light = false }: { light?: boolean }) {
   return (
-    <button className={`logo ${light ? 'logo-light' : ''}`} onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} aria-label="اتوکالا">
+    <button className={`logo ${light ? 'logo-light' : ''}`} onClick={() => window.scrollTo({ top: 0, behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' })} aria-label="اتوکالا">
       <span className="logo-mark"><span /></span>
       <span className="logo-text"><strong>اتوکالا</strong><small>AUTOKALA</small></span>
     </button>

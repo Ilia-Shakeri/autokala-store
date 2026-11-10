@@ -6,6 +6,7 @@ import { AccountDialog } from './CommerceDialogs'
 import AdminLogin from './AdminLogin'
 import { loadCart, saveCart } from './storage'
 import { LoadingCar } from './LoadingCar'
+import { createPortal } from 'react-dom'
 
 const AdminPanel = lazy(() => import('./AdminPanel'))
 
@@ -19,10 +20,12 @@ export default function App() {
   const [toast, setToast] = useState('')
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const request = useRef(0)
+  const catalogRequest = useRef(0)
   const notify = useCallback((message: string) => { setToast(message); clearTimeout(timer.current); timer.current = setTimeout(() => setToast(''), 4000) }, [])
   const loadCatalog = useCallback(async () => {
-    try { setCatalog(await api<Catalog>('/catalog')); setError('') }
-    catch (failure) { setError(failure instanceof Error ? failure.message : 'ارتباط با فروشگاه برقرار نشد.') }
+    const id = ++catalogRequest.current
+    try { const next = await api<Catalog>('/catalog'); if(id===catalogRequest.current){setCatalog(next);setError('')} }
+    catch (failure) { if(id===catalogRequest.current)setError(failure instanceof Error ? failure.message : 'ارتباط با فروشگاه برقرار نشد.') }
   }, [])
   const bootstrap = useCallback(async () => {
     const id = ++request.current
@@ -34,7 +37,7 @@ export default function App() {
       if(!host.isAdminHost) await loadCatalog()
     } catch(failure) {if(id === request.current)setError((failure as Error).message)}
   }, [loadCatalog])
-  useEffect(() => {void bootstrap(); return () => {request.current++;clearTimeout(timer.current)}}, [bootstrap])
+  useEffect(() => {void bootstrap(); return () => {request.current++;catalogRequest.current++;clearTimeout(timer.current)}}, [bootstrap])
   useEffect(() => { saveCart(cart) }, [cart])
   useEffect(() => {
     const keyboard = () => {document.documentElement.dataset.input = 'keyboard'}
@@ -51,6 +54,6 @@ export default function App() {
     {context.isAdminHost ? user?.role === 'admin' ? <Suspense fallback={<div className="boot-state"><LoadingCar label="در حال باز کردن مدیریت…"/></div>}><AdminPanel user={user} onStore={()=>window.location.assign(context.publicOrigin)} onLogout={logout} onCatalogChange={()=>{}}/></Suspense> : <AdminLogin onAuthenticated={setUser} publicOrigin={context.publicOrigin}/> : <Storefront catalog={catalog!} cart={cart} setCart={setCart} user={user} onAccount={()=>setAccount(true)} onRefresh={loadCatalog} notify={notify}/>}
     {account && !context.isAdminHost && <AccountDialog user={user} adminRequested={false} onClose={()=>setAccount(false)} onAuthenticated={next=>{setUser(next);setAccount(false)}} onLogout={logout}/>}
     {error && <div className="connection-error" role="alert">{error}<button onClick={loadCatalog}>تلاش دوباره</button></div>}
-    {toast && <div className="toast" role="status">{toast}</div>}
+    {toast && createPortal(<div className="toast" role="status">{toast}</div>, document.body)}
   </>
 }

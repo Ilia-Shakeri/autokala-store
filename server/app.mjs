@@ -1,5 +1,5 @@
 import { createServer as createHttpServer } from 'node:http'
-import { readFileSync, statSync, realpathSync, existsSync } from 'node:fs'
+import { readFileSync, statSync, realpathSync } from 'node:fs'
 import { resolve, sep, extname, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { gzipSync } from 'node:zlib'
@@ -72,7 +72,11 @@ export function createApp({ dbPath, seed = true, reservationTtlMs = 24*60*60*100
     if (limits.size > 20000 && !limits.has(key)) throw new AppError(503,'سرور شلوغ است. کمی بعد تلاش کنید.')
     let entry = limits.get(key)
     if (!entry || entry.until <= now) { entry = {count:0,until:now+windowMs}; limits.set(key,entry) }
-    if (++entry.count > max) throw new AppError(429,'درخواست زیاد است. کمی بعد تلاش کنید.')
+    if (++entry.count > max) {
+      const error = new AppError(429,'درخواست زیاد است. کمی بعد تلاش کنید.')
+      error.retryAfter = Math.max(1,Math.ceil((entry.until-now)/1000))
+      throw error
+    }
   }
   const send = (res,status,value,extra = {}) => {
     const bytes = Buffer.from(JSON.stringify(value))
@@ -125,7 +129,13 @@ export function createApp({ dbPath, seed = true, reservationTtlMs = 24*60*60*100
       try { decodedPath = decodeURIComponent(path) } catch { throw new AppError(400,'نشانی درست نیست.') }
       if (!isAdminHost && /^\/(?:admin(?:\/|$)|api\/admin(?:\/|$))/i.test(decodedPath)) throw new AppError(404,'مسیر پیدا نشد.')
       if (path === '/health/live' && method === 'GET') return send(res,200,{ live:true })
-      if (path === '/health/ready' && method === 'GET') { store.db.prepare('SELECT 1').get(); return send(res,200,{ ready:true,staticBuilt:existsSync(resolve(distPath,'index.html')) }) }
+      if (path === '/health/ready' && method === 'GET') {
+        store.db.prepare('SELECT 1').get()
+        let staticBuilt = false
+        try { staticBuilt = statSync(resolve(distPath,'index.html')).isFile() } catch {}
+        const ready = !production || staticBuilt
+        return send(res,ready ? 200 : 503,{ready,staticBuilt})
+      }
       if (!path.startsWith('/api/')) return serveStatic(req,res,path)
       const ip = clientAddress(req)
       rateLimit(`all:${ip}`,300,60000)
@@ -214,9 +224,11 @@ export function createApp({ dbPath, seed = true, reservationTtlMs = 24*60*60*100
         const productMatch = /^\/api\/admin\/products\/(\d+)$/.exec(path)
         if (productMatch && method === 'PATCH') {
           const id = valid.integer(Number(productMatch[1]),'شناسه کالا',1,2147483647)
+          const input = await body(req)
           const existing = store.product(store.db.prepare(`${store.productQuery} WHERE p.id=?`).get(id))
           if (!existing) throw new AppError(404,'کالا پیدا نشد.')
-          return send(res,200,{product:writeProduct({...existing,...await body(req)},id)})
+          if ('expectedStock' in input && valid.integer(input.expectedStock,'موجودی قبلی',0,Number.MAX_SAFE_INTEGER) !== existing.stock) throw new AppError(409,'موجودی تغییر کرده؛ کالا را تازه کنید و دوباره ویرایش کنید.')
+          return send(res,200,{product:writeProduct({...existing,...input},id)})
         }
         const adminOrderMatch = /^\/api\/admin\/orders\/([A-Z0-9-]{10,40})$/.exec(path)
         if (adminOrderMatch && method === 'PATCH') {
@@ -251,7 +263,7 @@ export function createApp({ dbPath, seed = true, reservationTtlMs = 24*60*60*100
     } catch (error) {
       const status = error instanceof AppError ? error.status : 500
       if (status === 500) logger.error?.('Request failed:',error.message)
-      if (!res.headersSent) send(res,status,{error:status === 500 ? 'خطای سرور. دوباره تلاش کنید.' : error.message},status === 429 ? {'Retry-After':'60'} : {})
+      if (!res.headersSent) send(res,status,{error:status === 500 ? 'خطای سرور. دوباره تلاش کنید.' : error.message},status === 429 ? {'Retry-After':String(error.retryAfter || 60)} : {})
       else res.end()
     }
   }

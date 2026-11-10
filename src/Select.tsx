@@ -22,7 +22,7 @@ export function Select({ label, value, onValueChange, options, placeholder = 'ا
   const id = useId()
   const trigger = useRef<HTMLButtonElement>(null)
   const [invalid, setInvalid] = useState(false)
-  const showInvalid = invalid && !disabled
+  const showInvalid = invalid && !value && !disabled
   return <span className="select-shell" onInvalidCapture={event => {
     event.preventDefault()
     setInvalid(true)

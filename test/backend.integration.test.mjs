@@ -4,6 +4,7 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve, sep } from 'node:path'
 import { randomUUID } from 'node:crypto'
+import { request as httpRequest } from 'node:http'
 import { createApp } from '../server/app.mjs'
 import { hashPassword, verifyPassword } from '../server/auth.mjs'
 
@@ -70,6 +71,15 @@ test('health, catalog revalidation and headers work without a session', async (t
   assert.ok(catalog.headers.get('etag'))
   assert.equal((await c.request('/api/catalog', { headers: { 'If-None-Match': catalog.headers.get('etag') } })).status, 304)
   assert.equal((await c.request('/api/session')).data.user, null)
+})
+
+test('development readiness supports the API before a site build exists', async (t) => {
+  const f = await fixture(t,{distPath:join(tmpdir(),`autokala-missing-${randomUUID()}`)})
+  const c = f.client()
+  assert.equal((await c.request('/health/live')).status,200)
+  const ready = await c.request('/health/ready')
+  assert.equal(ready.status,200)
+  assert.deepEqual(ready.data,{ready:true,staticBuilt:false})
 })
 
 test('quote rejects bad quantities and uses database prices with merged duplicate lines', async (t) => {
@@ -170,6 +180,48 @@ test('concurrent buyers cannot sell the last unit twice', async (t) => {
   assert.equal(after.status, 200)
   assert.equal(after.data.products[0].stock, 0)
   assert.equal(f.store.db.prepare('SELECT COUNT(*) AS n FROM orders').get().n, 1)
+})
+
+test('a product edit waiting for its body preserves stock reserved by another request', async (t) => {
+  const f = await fixture(t)
+  const admin = await f.admin()
+  const before = f.store.catalog().products[0]
+  const bytes = Buffer.from(JSON.stringify({ name: `${before.name} تازه` }))
+  const started = new Promise(done => f.server.once('request', done))
+  let pending
+  const response = new Promise((done,reject) => {
+    pending = httpRequest({ hostname:'127.0.0.1',port:f.server.address().port,path:`/api/admin/products/${before.id}`,method:'PATCH',headers:{Host:`localhost:${f.server.address().port}`,Cookie:admin.cookie,'Content-Type':'application/json','Content-Length':bytes.length} },res => {
+      const chunks = []
+      res.on('data',chunk => chunks.push(chunk))
+      res.on('end',() => done({status:res.statusCode,data:JSON.parse(Buffer.concat(chunks).toString())}))
+      res.on('error',reject)
+    })
+    pending.on('error',reject)
+    pending.write(bytes.subarray(0,1))
+  })
+  await started
+  const reserved = await f.client().request('/api/orders',{method:'POST',data:orderInput([{productId:before.id,quantity:1}])})
+  pending.end(bytes.subarray(1))
+  assert.equal(reserved.status,201)
+  const changed = await response
+  assert.equal(changed.status,200)
+  assert.equal(changed.data.product.stock,before.stock-1)
+  assert.equal(f.store.catalog().products[0].stock,before.stock-1)
+})
+
+test('a stale inventory edit cannot overwrite stock reserved since the form opened', async (t) => {
+  const f = await fixture(t)
+  const admin = await f.admin()
+  const before = f.store.catalog().products[0]
+  assert.equal((await f.client().request('/api/orders',{method:'POST',data:orderInput()})).status,201)
+  const path = `/api/admin/products/${before.id}`
+  const stale = await admin.request(path,{method:'PATCH',data:{stock:before.stock+5,expectedStock:before.stock}})
+  assert.equal(stale.status,409)
+  assert.equal(f.store.catalog().products[0].stock,before.stock-1)
+  assert.equal((await admin.request(path,{method:'PATCH',data:{stock:before.stock+5,expectedStock:null}})).status,400)
+  const fresh = await admin.request(path,{method:'PATCH',data:{stock:before.stock+5,expectedStock:before.stock-1}})
+  assert.equal(fresh.status,200)
+  assert.equal(fresh.data.product.stock,before.stock+5)
 })
 
 test('guest order data requires its receipt token and does not leak by identifier', async (t) => {
@@ -295,7 +347,15 @@ test('JSON body, size limit, consent and auth throttle reject abuse', async (t) 
   assert.equal((await c.request('/api/subscribe', { method: 'POST', data: { phone: '+989123456789', consent: true } })).status, 201)
   assert.equal(f.store.db.prepare('SELECT COUNT(*) AS n FROM subscribers').get().n, 1)
   for (let i = 0; i < 15; i++) assert.equal((await c.request('/api/auth/login', { method: 'POST', data: { email: 'bad@example.test', password: 'short' } })).status, 400)
-  assert.equal((await c.request('/api/auth/login', { method: 'POST', data: { email: 'bad@example.test', password: 'short' } })).status, 429)
+  const blocked = await c.request('/api/auth/login', { method: 'POST', data: { email: 'bad@example.test', password: 'short' } })
+  assert.equal(blocked.status, 429)
+  assert.ok(Number(blocked.headers.get('retry-after')) > 850)
+  assert.ok(Number(blocked.headers.get('retry-after')) <= 900)
+  for (let i = 0; i < 2; i++) assert.equal((await c.request('/api/subscribe', { method: 'POST', data: { phone: '09123456789', consent: true } })).status, 201)
+  const subscriptionBlocked = await c.request('/api/subscribe', { method: 'POST', data: { phone: '09123456789', consent: true } })
+  assert.equal(subscriptionBlocked.status, 429)
+  assert.ok(Number(subscriptionBlocked.headers.get('retry-after')) >= 1)
+  assert.ok(Number(subscriptionBlocked.headers.get('retry-after')) <= 60)
 })
 
 test('persistent orders, stock and receipt secret survive database reopen', async (t) => {

@@ -108,13 +108,16 @@ export default function AdminPanel({ onStore, user, onLogout, onCatalogChange }:
   const [notice, setNotice] = useState('')
   const [busy, setBusy] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [compact, setCompact] = useState(() => window.matchMedia('(max-width:760px)').matches)
   const [productModal, setProductModal] = useState<{product: Product | null} | null>(null)
   const [categoryModal, setCategoryModal] = useState(false)
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
   const [paymentChecked, setPaymentChecked] = useState(false)
+  const [cancelChecked, setCancelChecked] = useState(false)
   const [orderFilter, setOrderFilter] = useState('all')
   const [orderSearch, setOrderSearch] = useState('')
   const [productSearch, setProductSearch] = useState('')
+  const [productCategory, setProductCategory] = useState('all')
   const [updated, setUpdated] = useState<Date | null>(null)
   const requestId = useRef(0)
   const orderRequestId = useRef(0)
@@ -161,13 +164,22 @@ export default function AdminPanel({ onStore, user, onLogout, onCatalogChange }:
 
   useEffect(() => { void refresh(); return () => { requestId.current++; orderRequestId.current++ } }, [refresh])
   useEffect(() => {
+    const media = window.matchMedia('(max-width:760px)')
+    const resize = () => { setCompact(media.matches); if (!media.matches) setSidebarOpen(false) }
+    resize()
+    media.addEventListener('change', resize)
+    return () => media.removeEventListener('change', resize)
+  }, [])
+  useEffect(() => {
     if (active !== 'سفارش‌ها') { setOrdersLoading(false); return }
     setOrdersLoading(true)
+    setOrderPage(null)
+    setOrdersError('')
     const timer = window.setTimeout(() => void loadOrders(0), orderSearch ? 250 : 0)
     return () => { window.clearTimeout(timer); orderRequestId.current++ }
   }, [active, orderSearch, orderFilter, loadOrders])
   useEffect(() => {
-    if (!sidebarOpen || !window.matchMedia('(max-width:760px)').matches) return
+    if (!sidebarOpen || !compact) return
     const previous = document.activeElement as HTMLElement | null
     const oldOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
@@ -177,12 +189,13 @@ export default function AdminPanel({ onStore, user, onLogout, onCatalogChange }:
       if (event.key === 'Escape') { event.preventDefault(); setSidebarOpen(false) }
       if (event.key !== 'Tab') return
       const list = buttons(), first = list[0], last = list.at(-1)
-      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus() }
+      if (!sidebarPanel.current?.contains(document.activeElement)) { event.preventDefault(); first?.focus() }
+      else if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus() }
       else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus() }
     }
     document.addEventListener('keydown', key)
     return () => { document.removeEventListener('keydown', key); document.body.style.overflow = oldOverflow; previous?.focus() }
-  }, [sidebarOpen])
+  }, [sidebarOpen, compact])
 
   const mutate = async (action: () => Promise<unknown>, message: string, after?: () => void, catalogChange = false) => {
     if (writeLock.current) return
@@ -205,7 +218,7 @@ export default function AdminPanel({ onStore, user, onLogout, onCatalogChange }:
   const categories = overview?.categories || []
   const pending = overview?.reports.byStatus.find(row => row.status === 'pending_payment')?.count || 0
   const filteredOrders = orders
-  const filteredProducts = useMemo(() => products.filter(product => normalize(`${product.name} ${product.sku} ${product.brand} ${product.category}`).includes(normalize(productSearch))), [products, productSearch])
+  const filteredProducts = useMemo(() => products.filter(product => (productCategory === 'all' || product.category === productCategory) && normalize(`${product.name} ${product.sku} ${product.brand} ${product.category}`).includes(normalize(productSearch))), [products, productSearch, productCategory])
   const report = useMemo(() => {
     const paid = (overview?.reports.byStatus || []).filter(row => paidStatuses.has(row.status))
     const count = paid.reduce((sum, row) => sum + row.count, 0)
@@ -213,28 +226,32 @@ export default function AdminPanel({ onStore, user, onLogout, onCatalogChange }:
     return { count, revenue, average: count ? Math.round(revenue / count) : 0 }
   }, [overview])
 
-  const showOrder = (id: string) => { setSelectedOrder(orderPage?.orders.find(order => order.id === id) || overview?.orders.find(order => order.id === id) || null); setPaymentChecked(false); setWriteError('') }
+  const showOrder = (id: string) => { setSelectedOrder(orderPage?.orders.find(order => order.id === id) || overview?.orders.find(order => order.id === id) || null); setPaymentChecked(false); setCancelChecked(false); setWriteError('') }
   const openProduct = (product: Product | null = null) => { setProductModal({ product }); setWriteError('') }
   const closeProduct = () => { if (!writeLock.current) { setProductModal(null); setWriteError('') } }
   const closeCategory = () => { if (!writeLock.current) { setCategoryModal(false); setWriteError('') } }
   const closeOrder = () => { if (!writeLock.current) { setSelectedOrder(null); setWriteError('') } }
-  const changeStatus = (order: Order, status: string) => void mutate(async () => { const result = await api<{order: Order}>(`/admin/orders/${encodeURIComponent(order.id)}`, { method: 'PATCH', body: json({ status }) }); setSelectedOrder(result.order) }, `وضعیت سفارش به «${statusLabels[status]}» تغییر کرد.`, () => setPaymentChecked(false), status === 'cancelled')
+  const changeStatus = (order: Order, status: string) => void mutate(async () => { const result = await api<{order: Order}>(`/admin/orders/${encodeURIComponent(order.id)}`, { method: 'PATCH', body: json({ status }) }); setSelectedOrder(result.order) }, `وضعیت سفارش به «${statusLabels[status]}» تغییر کرد.`, () => { setPaymentChecked(false); setCancelChecked(false) }, status === 'cancelled')
   const saveProduct = (value: ProductInput) => {
-    const productId = productModal?.product?.id
-    void mutate(() => api(`/admin/products${productId ? `/${productId}` : ''}`, {method: productId ? 'PATCH' : 'POST', body: json(value)}), productId ? 'تغییرات کالا ذخیره شد.' : 'کالای تازه در فروشگاه ثبت شد.', () => setProductModal(null), true)
+    const original = productModal?.product
+    const productId = original?.id
+    const changes = original ? Object.fromEntries(Object.entries(value).filter(([key, next]) => JSON.stringify(next) !== JSON.stringify(original[key as keyof ProductInput] ?? null))) : value
+    if (original && !Object.keys(changes).length) { setProductModal(null); return }
+    const payload = original && 'stock' in changes ? { ...changes, expectedStock: original.stock } : changes
+    void mutate(() => api(`/admin/products${productId ? `/${productId}` : ''}`, {method: productId ? 'PATCH' : 'POST', body: json(payload)}), productId ? 'تغییرات کالا ذخیره شد.' : 'کالای تازه در فروشگاه ثبت شد.', () => setProductModal(null), true)
   }
 
   return <div className="admin" dir="rtl">
-    {sidebarOpen && <button className="admin-sidebar-backdrop" aria-label="بستن فهرست مدیریت" onClick={() => setSidebarOpen(false)} />}
-    <aside ref={sidebarPanel} className={sidebarOpen ? 'admin-sidebar open' : 'admin-sidebar'} aria-label="فهرست مدیریت" role={sidebarOpen ? 'dialog' : undefined} aria-modal={sidebarOpen ? true : undefined}>
+    {sidebarOpen && compact && <button className="admin-sidebar-backdrop" aria-label="بستن فهرست با لمس زمینه" tabIndex={-1} aria-hidden="true" onClick={() => setSidebarOpen(false)} />}
+    <aside id="admin-navigation" ref={sidebarPanel} className={sidebarOpen ? 'admin-sidebar open' : 'admin-sidebar'} aria-label="فهرست مدیریت" role={sidebarOpen && compact ? 'dialog' : undefined} aria-modal={sidebarOpen && compact ? true : undefined}>
       <div className="sidebar-logo"><Logo light /><button aria-label="بستن فهرست مدیریت" onClick={() => setSidebarOpen(false)}><Icon name="x" /></button></div>
       <div className="admin-profile"><span>{user.name.slice(0, 2)}</span><p><strong>{user.name}</strong><small dir="ltr">{user.email}</small></p></div>
       <nav aria-label="مدیریت فروشگاه">{tabs.map(({title, icon}) => <button className={active === title ? 'active' : ''} aria-current={active === title ? 'page' : undefined} key={title} onClick={() => { setActive(title); setSidebarOpen(false); setWriteError('') }}><Icon name={icon} />{title}{title === 'سفارش‌ها' && pending > 0 && <b>{formatPrice(pending)}</b>}</button>)}</nav>
       <div className="admin-sidebar-footer"><button className="go-store" onClick={onStore}><Icon name="store" /> مشاهده فروشگاه</button><button className="go-store" onClick={onLogout}>خروج از حساب</button></div>
     </aside>
-    <div className="admin-content"><p className="admin-demo-banner">داده‌ها ساختگی و نمایشی‌اند؛ این گزارش، فروش و ارسال واقعی نیست.</p>
+    <div className="admin-content" inert={sidebarOpen && compact}><p className="admin-demo-banner">داده‌ها ساختگی و نمایشی‌اند؛ این گزارش، فروش و ارسال واقعی نیست.</p>
       <header className="admin-header">
-        <button className="admin-menu" aria-label="باز کردن فهرست مدیریت" aria-expanded={sidebarOpen} onClick={() => setSidebarOpen(true)}><Icon name="menu" /></button>
+        <button className="admin-menu" aria-label="باز کردن فهرست مدیریت" aria-controls="admin-navigation" aria-expanded={sidebarOpen} onClick={() => setSidebarOpen(true)}><Icon name="menu" /></button>
         <div><span>{dayFormatter.format(new Date())}</span><h1>{active}</h1></div>
         <div className="admin-header-actions"><button type="button" className="admin-refresh" title="دریافت تازه‌ترین اطلاعات" aria-label="دریافت تازه‌ترین اطلاعات" disabled={loading || ordersLoading || busy} onClick={() => void refresh()}>{loading||ordersLoading?<LoadingCar inline iconOnly label="دریافت اطلاعات…"/>:<Icon name="refresh"/>}</button><button className="new-product" disabled={!overview || busy} onClick={() => openProduct()}><Icon name="plus" /> افزودن کالا</button></div>
       </header>
@@ -251,19 +268,19 @@ export default function AdminPanel({ onStore, user, onLogout, onCatalogChange }:
 
         {(active === 'داشبورد' || active === 'سفارش‌ها') && <section className="orders-panel">
           <div className="panel-heading"><div><h2>{active === 'داشبورد' ? 'سفارش‌های اخیر' : 'مدیریت سفارش‌ها'}</h2><span>{formatPrice(active === 'داشبورد' ? overview.metrics.orders : orderPage?.pagination.total || 0)} سفارش؛ جزئیات هر سفارش را برای بررسی باز کنید.</span></div></div>
-          {active === 'سفارش‌ها' && <div className="admin-toolbar"><label>وضعیت سفارش<Select label="وضعیت سفارش" value={orderFilter} disabled={busy} onValueChange={setOrderFilter} options={[{value:'all',label:'همه وضعیت‌ها'},...Object.entries(statusLabels).map(([value,label])=>({value,label}))]} /></label><label className="admin-search">جست‌وجو در همه سفارش‌ها<input type="search" disabled={busy} value={orderSearch} onChange={e => setOrderSearch(e.target.value)} placeholder="کد سفارش، نام مشتری، ایمیل یا موبایل" /></label></div>}
+          {active === 'سفارش‌ها' && <div className="admin-toolbar"><label>وضعیت سفارش<Select label="وضعیت سفارش" value={orderFilter} disabled={busy} onValueChange={setOrderFilter} options={[{value:'all',label:'همه وضعیت‌ها'},...Object.entries(statusLabels).map(([value,label])=>({value,label}))]} /></label><label className="admin-search">جست‌وجو در همه سفارش‌ها<input type="search" maxLength={120} disabled={busy} value={orderSearch} onChange={e => setOrderSearch(e.target.value)} placeholder="کد سفارش، نام مشتری، ایمیل یا موبایل" /></label></div>}
           {active === 'سفارش‌ها' && ordersError && <div className="admin-error" role="alert"><p>{ordersError}</p><button disabled={ordersLoading} onClick={() => void loadOrders(requestedOffset.current)}>تلاش دوباره</button></div>}
           {active === 'سفارش‌ها' && ordersLoading && <div className="admin-page-loading"><LoadingCar inline label="دریافت صفحه سفارش‌ها…"/></div>}
           <div className="order-table"><div role="table" aria-label="سفارش‌های فروشگاه"><div className="table-row table-head" role="row"><span role="columnheader">شماره سفارش</span><span role="columnheader">مشتری</span><span role="columnheader">مبلغ (تومان)</span><span role="columnheader">زمان ثبت</span><span role="columnheader">وضعیت</span><span role="columnheader">جزئیات</span></div>
-            {(active === 'داشبورد' ? filteredOrders.slice(0, 8) : filteredOrders).map(order => <div className="table-row" key={order.id} role="row"><strong role="cell" className="admin-order-id" dir="ltr">{order.id}</strong><span role="cell" className="customer"><i>{order.customer.name.charAt(0)}</i>{order.customer.name}</span><b role="cell">{formatPrice(order.total)}</b><span role="cell">{dateLabel(order.createdAt)}</span><span role="cell"><i className={`status status-${order.status}`}>{statusLabels[order.status] || order.status}</i></span><span role="cell"><button className="confirm-btn" disabled={loading || ordersLoading || busy} onClick={() => showOrder(order.id)} aria-label={`جزئیات سفارش ${order.id}`}>بررسی</button></span></div>)}</div></div>
-          {!filteredOrders.length && <p className="admin-empty">سفارشی با این مشخصات پیدا نشد.</p>}
+            {(active === 'داشبورد' ? filteredOrders.slice(0, 8) : filteredOrders).map(order => <div className="table-row" key={order.id} role="row"><strong role="cell" data-label="شماره سفارش" className="admin-order-id" dir="ltr">{order.id}</strong><span role="cell" data-label="مشتری" className="customer"><i aria-hidden="true">{order.customer.name.charAt(0)}</i>{order.customer.name}</span><b role="cell" data-label="مبلغ (تومان)">{formatPrice(order.total)}</b><span role="cell" data-label="زمان ثبت">{dateLabel(order.createdAt)}</span><span role="cell" data-label="وضعیت"><i className={`status status-${order.status}`}>{statusLabels[order.status] || order.status}</i></span><span role="cell" data-label="جزئیات"><button className="confirm-btn" disabled={loading || ordersLoading || busy} onClick={() => showOrder(order.id)} aria-label={`جزئیات سفارش ${order.id}`}>بررسی</button></span></div>)}</div></div>
+          {!filteredOrders.length && !ordersLoading && !ordersError && <p className="admin-empty">سفارشی با این مشخصات پیدا نشد.</p>}
           {active === 'داشبورد' && overview.metrics.orders > 8 && <button className="admin-all-orders" onClick={() => setActive('سفارش‌ها')}>مشاهده همه سفارش‌ها <Icon name="arrow" size={16} /></button>}
           {active === 'سفارش‌ها' && orderPage && <nav className="admin-pagination" aria-label="صفحه‌های سفارش"><span>{orderPage.pagination.total ? `${formatPrice(orderPage.pagination.offset + 1)} تا ${formatPrice(orderPage.pagination.offset + orderPage.orders.length)} از ${formatPrice(orderPage.pagination.total)} سفارش` : 'سفارشی پیدا نشد.'}</span><div><button disabled={loading || ordersLoading || busy || orderPage.pagination.offset === 0} onClick={() => void loadOrders(Math.max(0, orderPage.pagination.offset - orderPage.pagination.limit))}>صفحه قبل</button><button disabled={loading || ordersLoading || busy || !orderPage.pagination.hasMore} onClick={() => void loadOrders(orderPage.pagination.offset + orderPage.pagination.limit)}>صفحه بعد</button></div></nav>}
         </section>}
 
-        {active === 'محصولات' && <section className="orders-panel products-admin"><div className="panel-heading"><div><h2>کالاهای فروشگاه</h2><span>{formatPrice(products.length)} کالا در پایگاه داده</span></div><button onClick={() => openProduct()}><Icon name="plus" size={18} /> کالای تازه</button></div><div className="admin-toolbar"><label className="admin-search">جست‌وجوی کالا<input type="search" value={productSearch} onChange={e => setProductSearch(e.target.value)} placeholder="نام کالا، برند یا کد فنی" /></label></div><div className="admin-product-grid">{filteredProducts.map(product => <div key={product.id}><div className={`admin-product-image bg-${product.color}`}><ProductImage product={product} /></div><p><small>{product.brand} · {product.category}</small><strong>{product.name}</strong><span>{formatPrice(product.price)} تومان · موجودی: {formatPrice(product.stock)}</span><span className="admin-sku" dir="ltr">{product.sku}</span></p><button aria-label={`ویرایش ${product.name}`} title="ویرایش کالا" onClick={() => openProduct(product)}><Icon name="edit" size={18} /></button></div>)}</div>{!filteredProducts.length && <p className="admin-empty">کالایی با این نام یا کد پیدا نشد.</p>}</section>}
+        {active === 'محصولات' && <section className="orders-panel products-admin"><div className="panel-heading"><div><h2>کالاهای فروشگاه</h2><span>{formatPrice(products.length)} کالا در پایگاه داده</span></div><button onClick={() => openProduct()}><Icon name="plus" size={18} /> کالای تازه</button></div><div className="admin-toolbar"><label className="admin-search">جست‌وجوی کالا<input type="search" value={productSearch} onChange={e => setProductSearch(e.target.value)} placeholder="نام کالا، برند یا کد فنی" /></label><label>دسته کالا<Select label="فیلتر دسته کالا" value={productCategory} onValueChange={setProductCategory} options={[{value:'all',label:'همه دسته‌ها'},...categories.map(category => ({value:category.title,label:category.title}))]} /></label></div><div className="admin-product-grid">{filteredProducts.map(product => <div key={product.id}><div className={`admin-product-image bg-${product.color}`}><ProductImage product={product} /></div><p><small>{product.brand} · {product.category}</small><strong>{product.name}</strong><span>{formatPrice(product.price)} تومان · موجودی: {formatPrice(product.stock)}</span><span className="admin-sku" dir="ltr">{product.sku}</span></p><button aria-label={`ویرایش ${product.name}`} title="ویرایش کالا" onClick={() => openProduct(product)}><Icon name="edit" size={18} /></button></div>)}</div>{!filteredProducts.length && <p className="admin-empty">کالایی با این نام یا کد پیدا نشد.</p>}</section>}
 
-        {active === 'دسته‌بندی‌ها' && <section className="orders-panel"><div className="panel-heading"><div><h2>دسته‌بندی کالاها</h2><span>شمار کالاهای هر دسته از اطلاعات فروشگاه محاسبه می‌شود.</span></div><button onClick={() => { setCategoryModal(true); setWriteError('') }}><Icon name="plus" size={18} /> دسته تازه</button></div><div className="admin-category-grid">{categories.map(category => <article key={category.id}><span className="category-symbol"><Icon name={categoryIcon(category.icon)} size={27} /></span><div><h3>{category.title}</h3><p>{formatPrice(category.count)} کالا</p></div><button onClick={() => { setProductSearch(category.title); setActive('محصولات') }} aria-label={`کالاهای ${category.title}`}>مشاهده</button></article>)}</div>{!categories.length && <p className="admin-empty">نخستین دسته کالا را بسازید.</p>}</section>}
+        {active === 'دسته‌بندی‌ها' && <section className="orders-panel"><div className="panel-heading"><div><h2>دسته‌بندی کالاها</h2><span>شمار کالاهای هر دسته از اطلاعات فروشگاه محاسبه می‌شود.</span></div><button onClick={() => { setCategoryModal(true); setWriteError('') }}><Icon name="plus" size={18} /> دسته تازه</button></div><div className="admin-category-grid">{categories.map(category => <article key={category.id}><span className="category-symbol"><Icon name={categoryIcon(category.icon)} size={27} /></span><div><h3>{category.title}</h3><p>{formatPrice(category.count)} کالا</p></div><button onClick={() => { setProductSearch(''); setProductCategory(category.title); setActive('محصولات') }} aria-label={`کالاهای ${category.title}`}>مشاهده</button></article>)}</div>{!categories.length && <p className="admin-empty">نخستین دسته کالا را بسازید.</p>}</section>}
 
         {active === 'گزارش فروش' && <section className="orders-panel">
           <div className="panel-heading"><div><h2>گزارش فروش، کل دوره</h2><span>گزارش از همه سفارش‌های پایگاه داده محاسبه می‌شود و به صفحه سفارش‌ها محدود نیست.</span></div></div>
@@ -284,9 +301,11 @@ export default function AdminPanel({ onStore, user, onLogout, onCatalogChange }:
         <dl className="admin-customer"><div><dt>نام مشتری</dt><dd>{selectedOrder.customer.name}</dd></div><div><dt>شماره موبایل</dt><dd dir="ltr">{selectedOrder.customer.phone}</dd></div><div><dt>ایمیل</dt><dd dir="ltr">{selectedOrder.customer.email || 'ثبت نشده'}</dd></div><div><dt>کد پستی</dt><dd dir="ltr">{selectedOrder.customer.postalCode}</dd></div><div className="admin-address"><dt>نشانی تحویل</dt><dd>{selectedOrder.customer.address}</dd></div></dl>
         <ul className="admin-order-items">{selectedOrder.items.map(item => <li key={item.productId}><div><strong>{item.name}</strong><span>{formatPrice(item.quantity)} عدد × {formatPrice(item.price)} تومان</span></div><b>{formatPrice(item.lineTotal)} تومان</b></li>)}</ul>
         <dl className="admin-order-totals"><div><dt>جمع کالاها</dt><dd>{formatPrice(selectedOrder.subtotal)} تومان</dd></div><div><dt>هزینه ارسال ثبت‌شده</dt><dd>{formatPrice(selectedOrder.shipping)} تومان</dd></div><div><dt>مبلغ سفارش</dt><dd><strong>{formatPrice(selectedOrder.total)} تومان</strong></dd></div></dl>
-        {selectedOrder.status === 'pending_payment' && <label className="admin-payment-check"><input type="checkbox" checked={paymentChecked} onChange={e => setPaymentChecked(e.target.checked)} disabled={busy} /><span>دریافت وجه این سفارش را بررسی کرده‌ام. این تأیید دستی است و تراکنش درگاه ایجاد نمی‌کند.</span></label>}
+        {selectedOrder.status === 'pending_payment' && selectedOrder.expiresAt && <p className="admin-hint">پایان رزرو موجودی: {dateLabel(selectedOrder.expiresAt)}</p>}
+        {selectedOrder.status === 'pending_payment' && !cancelChecked && <label className="admin-payment-check"><input type="checkbox" checked={paymentChecked} onChange={e => setPaymentChecked(e.target.checked)} disabled={busy} /><span>دریافت وجه این سفارش را بررسی کرده‌ام. این تأیید دستی است و تراکنش درگاه ایجاد نمی‌کند.</span></label>}
+        {cancelChecked && <p role="alert" className="admin-form-error">این سفارش لغو و موجودی آن آزاد می‌شود. بازگرداندن سفارش لغوشده ممکن نیست. لغو شود؟</p>}
         {writeError && <p className="admin-form-error" role="alert">{writeError}</p>}
-        <div className="modal-actions admin-order-actions">{selectedOrder.status === 'pending_payment' && <button type="button" className="admin-cancel" disabled={busy} onClick={() => changeStatus(selectedOrder, 'cancelled')}>لغو سفارش و بازگرداندن موجودی</button>}{nextStatus[selectedOrder.status] && <ActionButton type="button" pending={busy} disabled={selectedOrder.status === 'pending_payment' && !paymentChecked} onClick={() => changeStatus(selectedOrder, nextStatus[selectedOrder.status])}>{actionLabels[nextStatus[selectedOrder.status]]}<Icon name="check" size={18}/></ActionButton>}</div>
+        <div className="modal-actions admin-order-actions">{cancelChecked ? <><button type="button" disabled={busy} onClick={() => setCancelChecked(false)}>نگه‌داشتن سفارش</button><ActionButton type="button" className="admin-cancel" pending={busy} onClick={() => changeStatus(selectedOrder, 'cancelled')}>تأیید لغو سفارش</ActionButton></> : <>{selectedOrder.status === 'pending_payment' && <button type="button" className="admin-cancel" disabled={busy} onClick={() => setCancelChecked(true)}>لغو سفارش و بازگرداندن موجودی</button>}{nextStatus[selectedOrder.status] && <ActionButton type="button" pending={busy} disabled={selectedOrder.status === 'pending_payment' && !paymentChecked} onClick={() => changeStatus(selectedOrder, nextStatus[selectedOrder.status])}>{actionLabels[nextStatus[selectedOrder.status]]}<Icon name="check" size={18}/></ActionButton>}</>}</div>
       </div>
     </Modal>}
   </div>

@@ -129,3 +129,16 @@ test('production keeps security headers, secure cookies and the explicit write o
   assert.match(cookie, /SameSite=Lax/)
   assert.match(cookie, /; Secure/)
 })
+
+test('production readiness rejects a missing site build while liveness remains up', async (t) => {
+  const f = await fixture(t,{production:true,secureCookies:true,publicHost:'shop.example.test',adminHost:'admin.shop.example.test'})
+  const headers = {Host:'shop.example.test'}
+  assert.equal((await f.request('/health/ready',{headers})).status,200)
+  await rm(join(f.distPath,'index.html'))
+  assert.equal((await f.request('/health/live',{headers})).status,200)
+  const missing = await f.request('/health/ready',{headers})
+  assert.equal(missing.status,503)
+  assert.deepEqual(JSON.parse(missing.body.toString()),{ready:false,staticBuilt:false})
+  await mkdir(join(f.distPath,'index.html'))
+  assert.equal((await f.request('/health/ready',{headers})).status,503)
+})

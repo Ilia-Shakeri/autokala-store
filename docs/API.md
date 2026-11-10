@@ -13,7 +13,7 @@
 | روش | مسیر | ورودی و خروجی |
 | --- | --- | --- |
 | GET | `/health/live` | `{live:true}` |
-| GET | `/health/ready` | `{ready:true,staticBuilt:boolean}` |
+| GET | `/health/ready` | `{ready:boolean,staticBuilt:boolean}`؛ نبود پوسته معتبر در استقرار، ۵۰۳ و `ready:false`؛ توسعه بدون ساخت، فقط آمادگی سرور را نشان دهد |
 | GET | `/api/catalog` | `{products,categories,vehicles,settings}`؛ با ETag |
 | GET | `/api/context` | `{isAdminHost,publicOrigin}`؛ نشانی مدیر روی فروشگاه برنگردد |
 | GET | `/api/session` | `{user:null \| {id,name,email,role},isAdminHost}`؛ فقط نقش میزبان |
@@ -28,7 +28,7 @@
 | GET | `/api/admin/overview?offset=0&limit=200` | مدیر؛ `{metrics,orders,products,categories,subscribers,reports,pagination}` |
 | GET | `/api/admin/orders?offset=0&limit=200` | مدیر؛ `{orders,pagination}`؛ فیلتر `query` و `status` اختیاری |
 | POST | `/api/admin/products` | مدیر؛ کالای کامل بدون شناسه؛ پاسخ ۲۰۱، `{product}` |
-| PATCH | `/api/admin/products/:id` | مدیر؛ فیلد تغییر؛ پاسخ `{product}` |
+| PATCH | `/api/admin/products/:id` | مدیر؛ فقط فیلد تغییر؛ همراه ویرایش موجودی، `expectedStock` برابر موجودی هنگام باز شدن فرم؛ مغایرت، ۴۰۹؛ پاسخ `{product}` |
 | POST | `/api/admin/categories` | مدیر؛ `{title,icon}`؛ پاسخ ۲۰۱، `{category}` |
 | PATCH | `/api/admin/orders/:id` | مدیر؛ `{status}`؛ پاسخ `{order}` |
 | PATCH | `/api/admin/settings` | مدیر؛ فیلد تنظیم؛ پاسخ `{settings}` |
