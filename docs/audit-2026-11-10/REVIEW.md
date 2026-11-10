@@ -42,6 +42,7 @@
 - [P3 ProductImage.tsx]: One failed image blocked later source in same component. Failure now scoped to source URL.
 - [P3 CommerceDialogs.tsx]: Saved receipt list trusted malformed local values. Shape, bounds and duplicate IDs checked now.
 - [P3 .github/workflows/checks.yml]: No hosted check workflow existed. Pinned actions now run locked install, build and tests on Windows and Linux. Action source: [checkout](https://github.com/actions/checkout), [setup-node](https://github.com/actions/setup-node).
+- [P2 .github/workflows/checks.yml]: Repo stores photos with large-file pointers. Plain checkout would test pointer text. Hosted checkout now fetches real media before build/test.
 
 - [step 01/home]: Pass in 320, 390, 768, 1440px widths. Desktop style kept; no page side scroll in measured final views. [Before desk](01-desktop-before.png), [before phone](02-phone-before.png), [after 320](17-store-320-after.png), [after desk](23-home-desktop-after.png).
 - [step 02/nav]: Pass. Shop, categories, special, magazine, logo and skip path wired. Phone open/close, Escape/outside behavior reviewed. [Tablet](21-tablet-after.png).
