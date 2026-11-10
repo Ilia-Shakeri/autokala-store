@@ -1,5 +1,5 @@
 import { beforeEach,it,expect,vi } from 'vitest'
-import { render,screen,fireEvent,waitFor } from '@testing-library/react'
+import { render,screen,fireEvent,waitFor,within } from '@testing-library/react'
 import { CheckoutDialog } from '../../src/CommerceDialogs'
 import { api,ApiError } from '../../src/api'
 
@@ -133,4 +133,26 @@ it('warns before reload when session storage is blocked and still recovers withi
   render(<CheckoutDialog {...props}/>);submit();await screen.findByText('سفارش ثبت شد. پرداخت هنوز انجام نشده است.')
   const settled=new Event('beforeunload',{cancelable:true});window.dispatchEvent(settled)
   expect(settled.defaultPrevented).toBe(false)
+})
+
+it('shows authoritative quote lines and totals and keeps optional notes across collapse',async()=>{
+  mocked.mockResolvedValue(quote as never)
+  render(<CheckoutDialog items={items} user={null} onClose={()=>{}} onComplete={()=>{}}/>);await fill()
+  const summary=screen.getByRole('complementary',{name:'خلاصه سفارش'})
+  expect(within(summary).getByRole('heading',{name:'کالای نمونه'})).toBeTruthy()
+  expect(within(summary).getByText('جمع کالاها').nextElementSibling?.textContent).toContain('۲۰۰')
+  const toggle=screen.getByRole('button',{name:'افزودن یادداشت سفارش اختیاری'})
+  expect(toggle.getAttribute('aria-expanded')).toBe('false')
+  fireEvent.click(toggle)
+  fireEvent.change(screen.getByLabelText('یادداشت سفارش، اختیاری'),{target:{value:'یادداشت ساختگی'}})
+  fireEvent.click(toggle);fireEvent.click(toggle)
+  expect((screen.getByLabelText('یادداشت سفارش، اختیاری') as HTMLTextAreaElement).value).toBe('یادداشت ساختگی')
+})
+it('brings a failed request into focus and focuses the receipt after recovery',async()=>{
+  let attempts=0
+  mocked.mockImplementation(async path=>{if(path==='/quote')return quote;if(path==='/orders'){if(++attempts===1)throw new Error('خطای ساختگی');return {order}}return {} as never})
+  render(<CheckoutDialog items={items} user={null} onClose={()=>{}} onComplete={()=>{}}/>);await fill();submit()
+  const alert=await screen.findByRole('alert');expect(document.activeElement).toBe(alert)
+  submit();const success=await screen.findByText('سفارش ثبت شد. پرداخت هنوز انجام نشده است.')
+  expect(document.activeElement).toBe(success)
 })

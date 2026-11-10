@@ -1,5 +1,5 @@
 import { it,expect,vi } from 'vitest'
-import { render,screen,fireEvent } from '@testing-library/react'
+import { render,screen,fireEvent,waitFor } from '@testing-library/react'
 import Storefront from '../../src/Storefront'
 import { categories,products,vehicles } from '../../server/seed.mjs'
 import type { CartItem,Catalog } from '../../src/types'
@@ -67,7 +67,8 @@ it('keeps later cart additions when recovering an earlier order',async()=>{
   const view=render(<Storefront {...props} cart={original}/>)
   fireEvent.click(screen.getByRole('button',{name:'سبد خرید، 1 کالا'}))
   fireEvent.click(screen.getByRole('button',{name:'تکمیل مشخصات و ثبت سفارش'}))
-  await screen.findByText(/جمع سفارش/)
+  await screen.findByRole('button',{name:'ثبت سفارش در انتظار پرداخت'})
+  await waitFor(()=>expect((screen.getByRole('button',{name:'ثبت سفارش در انتظار پرداخت'}) as HTMLButtonElement).disabled).toBe(false))
   for(const [name,value] of [['نام و نام خانوادگی','کاربر نمونه'],['موبایل گیرنده','09123456789'],['ایمیل رسید','buyer@example.test'],['کد پستی','1234567890'],['نشانی کامل','نشانی ساختگی برای آزمون، پلاک ۱۲']])fireEvent.change(screen.getByLabelText(name,{exact:true}),{target:{value}})
   fireEvent.submit((screen.getByRole('button',{name:'ثبت سفارش در انتظار پرداخت'}) as HTMLButtonElement).form!)
   await screen.findByRole('alert')
