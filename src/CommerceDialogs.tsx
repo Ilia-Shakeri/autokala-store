@@ -2,7 +2,6 @@ import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
 import { api, json, ApiError } from './api'
 import { Modal } from './Modal'
 import { LoadingCar } from './LoadingCar'
-import { Select } from './Select'
 import { ActionButton } from './ActionButton'
 import { formatPrice, Icon } from './ui'
 import type { CartItem, Customer, Order, User, Product } from './types'
@@ -46,20 +45,6 @@ function rememberSubmission(value:Submission|null){
   if(value&&!saved)window.addEventListener('beforeunload',warnPendingSubmission)
   else window.removeEventListener('beforeunload',warnPendingSubmission)
   return saved
-}
-type SavedReceipt = {id: string; token?: string}
-function savedReceipts(): SavedReceipt[] {
-  try {
-    const value: unknown = JSON.parse(localStorage.getItem('autokala.receipts.v1') || '[]')
-    if (!Array.isArray(value)) return []
-    const seen = new Set<string>()
-    return value.filter((receipt): receipt is SavedReceipt => {
-      if (!receipt || typeof receipt !== 'object' || typeof receipt.id !== 'string' || !receipt.id.trim() || receipt.id.length > 80 || seen.has(receipt.id)) return false
-      if (receipt.token !== undefined && (typeof receipt.token !== 'string' || receipt.token.length > 256)) return false
-      seen.add(receipt.id)
-      return true
-    }).slice(0, 20)
-  } catch { return [] }
 }
 function OrderCard({ order }: {order: Order}) {
   return <article className="order-receipt"><p><strong>شماره سفارش</strong><b dir="ltr">{order.id}</b></p><p>وضعیت <strong>{statusLabels[order.status] || order.status}</strong></p><p>زمان ثبت <span>{new Date(order.createdAt).toLocaleString('fa-IR',{timeZone:'Asia/Tehran'})}</span></p>{order.items.map(item => <p key={item.productId}>{item.name} × {item.quantity.toLocaleString('fa-IR')}<span>{formatPrice(item.lineTotal)} تومان</span></p>)}<p>ارسال <span>{formatPrice(order.shipping)} تومان</span></p><p><strong>جمع سفارش</strong><strong>{formatPrice(order.total)} تومان</strong></p>{order.status === 'pending_payment' && order.expiresAt && <p>پایان مهلت رزرو <span>{new Date(order.expiresAt).toLocaleString('fa-IR',{timeZone:'Asia/Tehran'})}</span></p>}</article>
@@ -152,35 +137,4 @@ export function CheckoutDialog({items, user, onClose, onComplete, products = []}
   </Modal>
 }
 
-export function AccountDialog({user,adminRequested,onClose,onAuthenticated,onLogout}: {user: User | null; adminRequested: boolean; onClose:()=>void; onAuthenticated:(user:User)=>void; onLogout:()=>void}) {
-  const [mode, setMode] = useState<'login'|'register'|'track'>(user ? 'track' : 'login')
-  const [busy,setBusy] = useState(false)
-  const [error,setError] = useState('')
-  const [orders,setOrders] = useState<Order[]>([])
-  const [ordersLoading,setOrdersLoading] = useState(Boolean(user))
-  const [hasMore,setHasMore] = useState(false)
-  const [ordersError,setOrdersError] = useState('')
-  const [ordersAttempt,setOrdersAttempt] = useState(0)
-  const trackingRequest=useRef(0)
-  const [tracked,setTracked] = useState<Order | null>(null)
-  const [id,setId] = useState('')
-  const [token,setToken] = useState('')
-  const [savedReceipt,setSavedReceipt] = useState('')
-  const [saved] = useState(savedReceipts)
-  useEffect(() => {let active=true;const controller=new AbortController();setOrders([]);setOrdersError('');setHasMore(false);setOrdersLoading(Boolean(user));if(user)void api<{orders:Order[];pagination:{hasMore:boolean}}>('/orders?limit=50',{signal:controller.signal}).then(result=>{if(active){setOrders(result.orders);setHasMore(result.pagination.hasMore)}}).catch(e=>{if(active)setOrdersError(e.message)}).finally(()=>{if(active)setOrdersLoading(false)});return()=>{active=false;controller.abort()}}, [user,ordersAttempt])
-  const moreOrders = async () => {if(busy)return;setBusy(true);setError('');try{const result=await api<{orders:Order[];pagination:{hasMore:boolean}}>(`/orders?limit=50&offset=${orders.length}`);setOrders(current=>[...current,...result.orders]);setHasMore(result.pagination.hasMore)}catch(e){setError((e as Error).message)}finally{setBusy(false)}}
-  const submit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault(); if(busy)return;setBusy(true);setError('')
-    const data = new FormData(event.currentTarget)
-    try {const result = await api<{user:User}>(`/auth/${mode}`,{method:'POST',body:json(Object.fromEntries(data))});onAuthenticated(result.user)}catch(e){setError((e as Error).message)}finally{setBusy(false)}
-  }
-  const clearTracking = () => {trackingRequest.current++;setTracked(null);setError('')}
-  const track = async (event:FormEvent) => {event.preventDefault();if(busy)return;const request=++trackingRequest.current;setBusy(true);setError('');setTracked(null);try{const result=await api<{order:Order}>(`/orders/${encodeURIComponent(id.trim())}`,{headers:{'X-Receipt-Token':token.trim()}});if(request===trackingRequest.current)setTracked(result.order)}catch(e){if(request===trackingRequest.current)setError((e as Error).message)}finally{setBusy(false)}}
-  return <Modal title={user ? `حساب ${user.name}` : adminRequested ? 'ورود مدیر فروشگاه' : 'حساب و پیگیری سفارش'} onClose={onClose}>
-    <div className="filter-pills dialog-tabs">{!user && <><button aria-pressed={mode==='login'} onClick={()=>{setMode('login');setError('')}} className={mode==='login'?'active':''}>ورود</button><button aria-pressed={mode==='register'} onClick={()=>{setMode('register');setError('')}} className={mode==='register'?'active':''}>ساخت حساب</button></>}<button aria-pressed={mode==='track'} onClick={()=>{setMode('track');setError('')}} className={mode==='track'?'active':''}>پیگیری سفارش</button></div>
-    {!user && mode!=='track' && <form onSubmit={submit}><div className="form-grid">{mode==='register'&&<label>نام کامل<input required name="name" autoComplete="name" minLength={2} maxLength={120} placeholder="نام و نام خانوادگی" /></label>}<label>ایمیل<input required name="email" type="email" maxLength={254} dir="ltr" autoComplete="username" placeholder="name@example.com" /></label><label>رمز عبور<input required name="password" type="password" minLength={12} maxLength={128} autoComplete={mode==='register'?'new-password':'current-password'} placeholder="حداقل ۱۲ نویسه" /></label></div><div className="modal-actions"><ActionButton pending={busy} pendingLabel="در حال بررسی…">{mode==='login'?'ورود به حساب':'ساخت حساب'}</ActionButton></div>{adminRequested&&<p className="muted-note">حساب مدیر با فرمان محلی ساخته می‌شود. حساب تازه، دسترسی مدیریت ندارد.</p>}</form>}
-    {(mode==='track'||user)&&<><form onSubmit={track}><div className="form-grid"><label>شماره سفارش<input required value={id} maxLength={80} onChange={e=>{clearTracking();setSavedReceipt('');setId(e.target.value)}} dir="ltr" placeholder="شماره روی رسید" /></label><label>کلید پیگیری<input required={!user} value={token} maxLength={256} onChange={e=>{clearTracking();setSavedReceipt('');setToken(e.target.value)}} dir="ltr" placeholder="کلید محرمانه روی رسید" /></label></div><div className="modal-actions"><ActionButton pending={busy} done={Boolean(tracked)&&!error} pendingLabel="در حال دریافت…" doneLabel="سفارش پیدا شد">نمایش سفارش</ActionButton></div></form>{saved.length>0&&<label className="description-field">رسیدهای این دستگاه<Select label="رسیدهای این دستگاه" value={savedReceipt} placeholder="انتخاب رسید ذخیره‌شده" options={saved.map(r=>({value:r.id,label:r.id}))} onValueChange={value=>{clearTracking();setSavedReceipt(value);const receipt=saved.find(r=>r.id===value);if(receipt){setId(receipt.id);setToken(receipt.token||'')}}}/></label>}{tracked&&<OrderCard order={tracked} />}{user&&<><h3>سفارش‌های حساب</h3>{ordersLoading?<LoadingCar label="در حال دریافت سفارش‌ها…"/>:ordersError?<div className="form-error" role="alert"><p>{ordersError}</p><button type="button" onClick={()=>setOrdersAttempt(value=>value+1)}>دریافت دوباره سفارش‌ها</button></div>:orders.length?orders.map(order=><OrderCard order={order} key={order.id}/>):<p className="muted-note">هنوز سفارشی با این حساب ثبت نشده است.</p>}</>}</>}
-    {hasMore&&<div className="modal-actions"><ActionButton onClick={moreOrders} pending={busy} pendingLabel="در حال دریافت…">سفارش‌های بیشتر</ActionButton></div>}
-    {error&&<p className="form-error" role="alert">{error}</p>}{user&&<div className="modal-actions"><button onClick={()=>{onLogout();onClose()}}>خروج از حساب</button></div>}
-  </Modal>
-}
+export { AccountDialog } from './AccountDialog'

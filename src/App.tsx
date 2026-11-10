@@ -52,7 +52,7 @@ export default function App() {
   if(!context || (!context.isAdminHost && !catalog))return <main className="boot-state" dir="rtl"><h1>اتوکالا</h1>{error?<><p role="alert">{error}</p><button onClick={bootstrap}>تلاش دوباره</button></>:<LoadingCar label="در حال دریافت فروشگاه…"/>}</main>
   return <>
     {context.isAdminHost ? user?.role === 'admin' ? <Suspense fallback={<div className="boot-state"><LoadingCar label="در حال باز کردن مدیریت…"/></div>}><AdminPanel user={user} onStore={()=>window.location.assign(context.publicOrigin)} onLogout={logout} onCatalogChange={()=>{}}/></Suspense> : <AdminLogin onAuthenticated={setUser} publicOrigin={context.publicOrigin}/> : <Storefront catalog={catalog!} cart={cart} setCart={setCart} user={user} onAccount={()=>setAccount(true)} onRefresh={loadCatalog} notify={notify}/>}
-    {account && !context.isAdminHost && <AccountDialog user={user} adminRequested={false} onClose={()=>setAccount(false)} onAuthenticated={next=>{setUser(next);setAccount(false)}} onLogout={logout}/>}
+    {account && !context.isAdminHost && <AccountDialog user={user} adminRequested={false} onClose={()=>setAccount(false)} onAuthenticated={setUser} onLogout={logout}/>}
     {error && <div className="connection-error" role="alert">{error}<button onClick={loadCatalog}>تلاش دوباره</button></div>}
     {toast && createPortal(<div className="toast" role="status">{toast}</div>, document.body)}
   </>

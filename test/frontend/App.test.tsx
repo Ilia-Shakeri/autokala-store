@@ -4,9 +4,9 @@ import App from '../../src/App'
 import { api } from '../../src/api'
 
 vi.mock('../../src/api',()=>({api:vi.fn(),json:JSON.stringify}))
-vi.mock('../../src/Storefront',()=>({default:({catalog,onRefresh}:{catalog:{products:{name:string}[]};onRefresh:()=>void})=> <main><span>فروشگاه عمومی</span><span data-testid="catalog-revision">{catalog.products[0]?.name}</span><button onClick={onRefresh}>دریافت کاتالوگ</button></main>}))
+vi.mock('../../src/Storefront',()=>({default:({catalog,onRefresh,onAccount}:{onAccount:()=>void;catalog:{products:{name:string}[]};onRefresh:()=>void})=> <main><span>فروشگاه عمومی</span><span data-testid="catalog-revision">{catalog.products[0]?.name}</span><button onClick={onRefresh}>دریافت کاتالوگ</button><button onClick={onAccount}>باز کردن حساب</button></main>}))
 vi.mock('../../src/AdminPanel',()=>({default:()=> <main>پنل خصوصی</main>}))
-vi.mock('../../src/CommerceDialogs',()=>({AccountDialog:()=> <div>حساب مشتری</div>}))
+vi.mock('../../src/CommerceDialogs',()=>({AccountDialog:({user,onAuthenticated}:{user:{name:string}|null;onAuthenticated:(user:unknown)=>void})=> <div>حساب مشتری {user?.name}<button onClick={()=>onAuthenticated({id:1,name:'مشتری واردشده',email:'buyer@example.test',role:'customer'})}>ورود نمونه</button></div>}))
 const mocked=vi.mocked(api)
 beforeEach(()=>mocked.mockReset())
 const customer={id:1,name:'مشتری',email:'buyer@example.test',role:'customer'}
@@ -50,4 +50,11 @@ it('keeps the newest catalog when an older refresh finishes last',async()=>{
   expect(screen.getByTestId('catalog-revision').textContent).toBe('کالای تازه')
   await act(async()=>older(catalog('کالای کهنه')))
   expect(screen.getByTestId('catalog-revision').textContent).toBe('کالای تازه')
+})
+
+it('keeps the customer dialog open after successful authentication to show the account',async()=>{
+  bootstrap(false,null);render(<App/>);await screen.findByText('فروشگاه عمومی')
+  fireEvent.click(screen.getByRole('button',{name:'باز کردن حساب'}))
+  fireEvent.click(screen.getByRole('button',{name:'ورود نمونه'}))
+  expect(screen.getByText('حساب مشتری مشتری واردشده')).toBeTruthy()
 })
